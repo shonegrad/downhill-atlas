@@ -10,7 +10,7 @@ courses, descent smoothing, ribbon/label polish). QA-verified and deployed.
 
 A static, browser-based 3D explorer for named ski courses. Mountains render as a stylized
 grayscale relief; all scene color is data-driven (featured course ribbon, difficulty-colored
-pistes, lifts). Locations and courses (switchable in the UI, deep-linkable via `?loc=` /
+piste bands, lifts). Locations and courses (switchable in the UI, deep-linkable via `?loc=` /
 `?course=`):
 
 | Location | Courses | Route source | Landmarks |
@@ -40,7 +40,7 @@ npm run prep:data  # re-run the full data pipeline (per-location, cached pulls)
 src/data/loader.ts        # typed loaders for terrain/route/pistes/lifts/manifest/locations (+ per-course routes)
 src/scene/coordinates.ts  # local ENU frame: east=x, north=-z, h - elevationMin scaled by verticalScale
 src/scene/terrainMesh.ts  # grayscale vertex-color terrain + slope/snow repaint
-src/scene/routeLayer.ts   # featured ribbon, per-feature line records, highlight state
+src/scene/routeLayer.ts   # featured ribbon + draped piste bands, per-feature records, highlight state
 src/scene/labels.ts       # projected landmark labels (screen-space decluttering, no CSS2DRenderer)
 src/scene/descent.ts      # damped camera descent: blended ease-in, smoothed path, distance-normalized speed
 src/scene/createScene.ts  # scene assembly, picking, camera presets, layer visibility, swapRoute
@@ -98,6 +98,10 @@ without silently re-drawing OSM:
   descent smoothing (damped full pose, ease-in blend, smoothed camera path) with
   piste-scale draped featured band (amber, non-red), terrain edge feathering;
   landmark decluttering; `?course=` deep links.
+- **Plan v0.4 round (21 Oct 2026)** — done. Race gates removed from the slope;
+  context pistes redrawn as draped surfaces (~14 m bands clamped to the rendered
+  terrain surface, edge cross-shading, 0.72 opacity, AOI-border alpha fade)
+  instead of 1 px hairlines. Lifts stay hairlines.
 
 QA (`npm run qa`) passes for both locations with zero console errors, including course
 switching at Kopaonik and the `?loc=kopaonik&course=pancic-vrh` deep link.
@@ -131,13 +135,14 @@ switching at Kopaonik and the `?loc=kopaonik&course=pancic-vrh` deep link.
   an orange carpet" look, height alone does not), `POSITION_DAMPING`,
   `LOOK_DAMPING`, `BLEND_SECONDS`, `EASE_WINDOW`; descent scenery fade lives in
   `routeLayer.ts` (`setFeaturedDescentFade`, `DESCENT_*_TINT`), the scale boost
-  + FOV glide in `createScene.ts` (`DESCENT_SCALE_BOOST`, `DESCENT_FOV`); gate
-  spacing/size in `routeLayer.ts` (`GATE_SPACING_M` 90, `GATE_POLE_M` 3.8,
-  gates are planted on the ribbon surface — keep that if you touch the band
-  lift); featured band width caps live in `routeLayer.ts` (`halfWidth` = min
-  9.5 m) with the amber centerline hairline right below; base timing per course
-  is `route.descentDurationSeconds`, stamped by `assemble-route.mjs` from route
-  length; reduced-motion doubles it at runtime.
+  + FOV glide in `createScene.ts` (`DESCENT_SCALE_BOOST`, `DESCENT_FOV`); context
+  pistes are draped bands (not hairlines) in `routeLayer.ts`
+  (`PISTE_BAND_HALF_WIDTH` 7 m, `PISTE_BAND_LIFT`, `PISTE_BAND_OPACITY` — they
+  are clamped to the rendered terrain surface via `sampleSurface()` in
+  `coordinates.ts`, so keep the lift small); featured band width caps live in
+  `routeLayer.ts` (`halfWidth` = min 9.5 m) with the amber centerline hairline
+  right below; base timing per course is `route.descentDurationSeconds`, stamped
+  by `assemble-route.mjs` from route length; reduced-motion doubles it at runtime.
 - Curated courses live in two places: the input (`scripts/data-prep/curated/...`, reviewed
   provenance) and the generated `public/data/<id>/routes/<course>.json`. Edit the input,
   re-run `npm run prep:data -- <id>`; never hand-edit the generated files.

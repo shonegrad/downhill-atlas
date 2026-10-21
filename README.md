@@ -1,6 +1,6 @@
 # Downhill Atlas
 
-A browser-based 3D explorer for famous ski courses. Mountains render as a stylized grayscale relief (plan-style); the colors in the scene come from the data: the featured course ribbon, difficulty-colored pistes, and lifts. Locations and courses:
+A browser-based 3D explorer for famous ski courses. Mountains render as a stylized grayscale relief (plan-style); the colors in the scene come from the data: the featured course ribbon, difficulty-colored piste bands, and lifts. Locations and courses:
 - **Streif, Kitzbühel** (Austria) — Hahnenkamm terrain, featured course ribbon + section landmarks, guided camera descent.
 - **Kopaonik, Serbia** — resort-wide terrain with difficulty-colored pistes and lifts; two switchable courses: Duboka 1 (default) and Pančićev vrh (assembled from a curated ordered way list, see below).
 

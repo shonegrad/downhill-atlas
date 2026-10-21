@@ -90,7 +90,11 @@ for (const loc of ['streif', 'kopaonik']) {
   await page.screenshot({ path: `${OUT}/${loc}-2-selection.png` });
   if (selVisible) {
     selText = await page.$eval('#selection-panel', (n) => n.textContent);
-    if (!selText.includes('OSM way')) report(`[${loc}] selection panel lacks provenance line`);
+    // Provenance line: pistes/lifts cite their OSM way, the featured course
+    // cites its relation / curated order.
+    if (!selText.includes('OSM way') && !selText.includes('Featured course')) {
+      report(`[${loc}] selection panel lacks provenance line`);
+    }
     await page.keyboard.press('Escape');
   }
 

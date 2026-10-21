@@ -91,6 +91,10 @@ export function createScene(canvas: HTMLCanvasElement, data: Dataset, callbacks:
 
   const terrainGroup = new THREE.Group();
   const terrainMesh = buildTerrain(terrain);
+  // The terrain is a transparent mesh (border feather), so it is drawn in the
+  // transparent pass. Keep it at renderOrder 0 so the piste bands
+  // (renderOrder 1) and the featured course (renderOrder 3-5) blend over it.
+  terrainMesh.renderOrder = 0;
   repaintByNormals(terrain, terrainMesh);
   terrainGroup.add(terrainMesh);
 

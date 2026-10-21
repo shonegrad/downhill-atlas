@@ -21,11 +21,26 @@ const SNOW = new THREE.Color('#f3f3f3');
 // ending on a hard edge.
 const FADE_FRACTION = 0.16;
 
+// Fade of the terrain at a plan position, 1 inside the mesh, 0 at the border.
+// Overlays (piste bands) reuse it so they dissolve with the snow instead of
+// floating past the edge of the world.
+export function borderFadeAt(t: TerrainAsset, east: number, north: number): number {
+  const fade = fadeCells(t);
+  const col = (east + t.eastMeters / 2) / t.spacing;
+  const row = (north + t.northMeters / 2) / t.spacing;
+  const edgeDist = Math.min(row, t.ny - 1 - row, col, t.nx - 1 - col);
+  return smoothstep(0, fade, edgeDist);
+}
+
+function fadeCells(t: TerrainAsset): number {
+  return Math.max(2, Math.round(Math.min(t.nx, t.ny) * FADE_FRACTION));
+}
+
 function borderFadeRamp(t: TerrainAsset): Float32Array {
   const nx = t.nx;
   const ny = t.ny;
   const ramp = new Float32Array(nx * ny);
-  const fade = Math.max(2, Math.round(Math.min(nx, ny) * FADE_FRACTION));
+  const fade = fadeCells(t);
   for (let j = 0; j < ny; j++) {
     const edgeDist = Math.min(j, ny - 1 - j);
     for (let i = 0; i < nx; i++) {

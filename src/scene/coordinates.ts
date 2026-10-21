@@ -54,3 +54,37 @@ export function sampleTerrain(t: TerrainAsset, east: number, north: number): num
     (at(y1, x0) * (1 - tx) + at(y1, x1) * tx) * ty
   );
 }
+
+// Height of the *rendered* terrain mesh (the triangulated grid), not the
+// bilinear DEM. Overlay bands draped on this surface sit exactly on the
+// visible snow instead of dipping under a terrain triangle.
+export function sampleSurface(t: TerrainAsset, east: number, north: number): number {
+  const col = (east + t.eastMeters / 2) / t.spacing;
+  const row = (north + t.northMeters / 2) / t.spacing;
+  const cx = Math.min(Math.max(col, 0), t.nx - 1);
+  const cy = Math.min(Math.max(row, 0), t.ny - 1);
+  const x0 = Math.floor(cx);
+  const y0 = Math.floor(cy);
+  const x1 = Math.min(x0 + 1, t.nx - 1);
+  const y1 = Math.min(y0 + 1, t.ny - 1);
+  const tx = cx - x0;
+  const ty = cy - y0;
+  const at = (r: number, c: number) => t.heights[r * t.nx + c] ?? 0;
+  const h00 = at(y0, x0);
+  const h10 = at(y0, x1);
+  const h01 = at(y1, x0);
+  const h11 = at(y1, x1);
+  // Grid cell triangles: (x0,y0)-(x1,y0)-(x1,y1) and (x0,y0)-(x1,y1)-(x0,y1).
+  if (ty <= tx) {
+    // lower-right triangle: weights on (x0,y0), (x1,y0), (x1,y1)
+    const wA = 1 - tx;
+    const wB = tx - ty;
+    const wD = ty;
+    return h00 * wA + h10 * wB + h11 * wD;
+  }
+  // upper-left triangle: weights on (x0,y0), (x1,y1), (x0,y1)
+  const wA = 1 - ty;
+  const wD = tx;
+  const wC = ty - tx;
+  return h00 * wA + h11 * wD + h01 * wC;
+}

@@ -227,6 +227,8 @@ Implemented in this phase:
 3. **Race gates** — slalom pole+panel pairs every 90 m, alternating blue/red
    (real convention), planted on the ribbon surface (not raw terrain — the old
    ground-level poles sank under the groomed veil), 3.8 m poles, 2.2×1.5 m panels.
+   **Later removed** (see the v0.4 addendum): the gates read as clutter on the
+   slope and were dropped on request.
 4. **Descent scenery fade** — the featured band melts into the slope during the
    ride: amber veil fades to translucent (reads as a sun-warmed groomed track),
    the near-black course rim lightens, the centerline hairline dims; everything
@@ -270,6 +272,27 @@ Implemented in this phase:
 7. **Context hygiene** — a curated featured chain can splice differently-named
    ways (the shared corridor is mapped as Црна дубока); `export-context.mjs`
    now also excludes the featured curated file's way ids.
+
+## Plan v0.4 addendum — surface pistes, no gates (21 Oct 2026)
+
+Two visual changes requested after the v0.3 round shipped:
+
+1. **Race gates removed** — the slalom pole/panel pairs (`speedGates()` in
+   `routeLayer.ts`, `GATE_SPACING_M` / `GATE_POLE_M`) are gone. They were pure
+   scenery and only added clutter to the slope; nothing else depended on them.
+2. **Context pistes are surfaces, not hairlines** — the difficulty-colored
+   pistes were `THREE.Line` 1 px strokes that all but disappeared against the
+   snow at overview zoom (the same reason the featured course needed an amber
+   centerline hairline). Every piste is now a **draped band**: a ~14 m wide
+   strip (`PISTE_BAND_HALF_WIDTH` 7 m) whose vertices are clamped to the
+   rendered terrain surface at their own plan position, cross-shaded at the
+   edges, translucent (0.72) so overlapping corridors blend, and alpha-faded at
+   the AOI border so they dissolve with the terrain instead of floating past
+   it. Lifts stay hairlines (they are aerial cables, not ground surfaces).
+   Consequences: pistes are now picked as meshes (no more generous line
+   threshold for them), and the legend wording changed from "other pistes and
+   lifts are thin lines" to "other pistes are coloured bands; lifts are thin
+   lines".
 
 ## Reference facts and sources
 

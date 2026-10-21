@@ -261,7 +261,7 @@ export async function bootApp(canvas: HTMLCanvasElement): Promise<void> {
     const note = document.createElement('p');
     note.className = 'legend-note';
     note.textContent =
-      'Difficulty classes and colors follow the OSM mapping; local trail-color conventions differ. Non-color cue: the featured course is the thick ribbon; other pistes and lifts are thin lines.';
+      'Difficulty classes and colors follow the OSM mapping; local trail-color conventions differ. Non-color cue: the featured course is the wide amber band; other pistes are coloured bands; lifts are thin lines.';
     frag.append(note);
     legendPanel.replaceChildren(frag);
   }
