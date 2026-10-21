@@ -41,6 +41,7 @@ src/data/loader.ts        # typed loaders for terrain/route/pistes/lifts/manifes
 src/scene/coordinates.ts  # local ENU frame: east=x, north=-z, h - elevationMin scaled by verticalScale
 src/scene/terrainMesh.ts  # grayscale vertex-color terrain + slope/snow repaint
 src/scene/routeLayer.ts   # featured ribbon + draped piste bands, per-feature records, highlight state
+src/scene/skiRide.ts      # ski mode: edge/fall-line physics, skier avatar, ski track, chase camera
 src/scene/labels.ts       # projected landmark labels (screen-space decluttering, no CSS2DRenderer)
 src/scene/descent.ts      # damped camera descent: blended ease-in, smoothed path, distance-normalized speed
 src/scene/createScene.ts  # scene assembly, picking, camera presets, layer visibility, swapRoute
@@ -102,6 +103,10 @@ without silently re-drawing OSM:
   context pistes redrawn as draped surfaces (~14 m bands clamped to the rendered
   terrain surface, edge cross-shading, 0.72 opacity, AOI-border alpha fade)
   instead of 1 px hairlines. Lifts stay hairlines.
+- **Plan v0.5 round (21 Oct 2026)** — done. User-steered **ski mode** next to
+  the guided descent: arrow-key steering, edge/fall-line physics, skier avatar
+  + ski track, chase camera with speed FOV, telemetry HUD, touch pads for
+  phones. Scope note in `research_brief_brd.md`.
 
 QA (`npm run qa`) passes for both locations with zero console errors, including course
 switching at Kopaonik and the `?loc=kopaonik&course=pancic-vrh` deep link.
@@ -146,6 +151,13 @@ switching at Kopaonik and the `?loc=kopaonik&course=pancic-vrh` deep link.
 - Curated courses live in two places: the input (`scripts/data-prep/curated/...`, reviewed
   provenance) and the generated `public/data/<id>/routes/<course>.json`. Edit the input,
   re-run `npm run prep:data -- <id>`; never hand-edit the generated files.
+- Ski mode constants live in `src/scene/skiRide.ts` (`EDGE_ANGLE` 0.8 rad sets
+  the turn radius, `GRIP` 4.2 /s the edge hold, `DRAG_UPRIGHT`/`DRAG_TUCKED`
+  the speed ceiling, `MAX_SPEED` 40 m/s, `CHASE_DIST`/`CHASE_HEIGHT`/`FOV_*`
+  the camera). The physics use the raw DEM slope, so the run must stay at
+  **natural relief** (scale 1.0) — do not boost the vertical scale in ski mode.
+  The skier and its track are children of the scene root, not the terrain
+  group, so the avatar is not stretched; their heights are scaled by hand.
 - Location AOI sizing rule: cover the courses plus a few hundred metres of
   margin, not the whole resort. An oversized AOI pushes the overview/top-down
   cameras so far out that the ~19 m featured band falls below depth precision

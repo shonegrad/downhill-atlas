@@ -127,7 +127,6 @@ body {
   font-family: inherit;
   text-align: left;
 }
-
 .legend-item[aria-pressed='false'] {
   opacity: 0.4;
 }
@@ -386,6 +385,148 @@ button:focus-visible {
   color: #7c2f24;
 }
 
+/* --- ski mode HUD --------------------------------------------------------- */
+.ski-hud {
+  position: absolute;
+  z-index: 6;
+  top: 64px;
+  left: 14px;
+  min-width: 190px;
+  background: var(--paper);
+  backdrop-filter: blur(4px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px 14px 12px;
+  box-shadow: 0 2px 10px rgba(10, 30, 50, 0.12);
+  font-variant-numeric: tabular-nums;
+}
+
+.ski-speed {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  font-size: 2.1rem;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.ski-unit {
+  font-size: 0.78rem;
+  font-weight: 500;
+  opacity: 0.65;
+}
+
+.ski-stats {
+  margin: 8px 0 0;
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 2px 12px;
+  font-size: 0.8rem;
+}
+
+.ski-stats > div {
+  display: contents;
+}
+
+.ski-stats dt {
+  opacity: 0.7;
+}
+
+.ski-stats dd {
+  margin: 0;
+  text-align: right;
+}
+
+.ski-hint {
+  margin: 10px 0 0;
+  font-size: 0.72rem;
+  opacity: 0.75;
+  line-height: 1.7;
+}
+
+.ski-hint .key {
+  display: inline-block;
+  min-width: 1.1em;
+  padding: 0 4px;
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: #fff;
+  text-align: center;
+  font-size: 0.7rem;
+}
+
+.ski-touch {
+  position: absolute;
+  z-index: 6;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  display: none;
+  grid-template-columns: repeat(3, 56px);
+  grid-template-rows: repeat(2, 56px);
+  gap: 6px;
+  justify-content: center;
+}
+
+.ski-touch button {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 1rem;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+}
+
+.ski-touch button.pressed {
+  background: #1b1f26;
+  color: #fff;
+}
+
+.ski-touch [data-ski='left'] {
+  grid-area: 2 / 1;
+}
+
+.ski-touch [data-ski='brake'] {
+  grid-area: 2 / 2;
+}
+
+.ski-touch [data-ski='tuck'] {
+  grid-area: 1 / 2;
+}
+
+.ski-touch [data-ski='right'] {
+  grid-area: 2 / 3;
+}
+
+@media (pointer: coarse) {
+  .ski-touch {
+    display: grid;
+  }
+}
+
+/* Ski mode on a phone: the facts panel and the legend would fight the
+   telemetry and the touch pad, so the run gets the screen. */
+@media (max-width: 720px) {
+  .app.skiing .facts {
+    display: none;
+  }
+
+  .app.skiing .ski-hud {
+    top: auto;
+    bottom: 148px;
+    left: 10px;
+    padding: 8px 12px 10px;
+  }
+
+  .app.skiing .ski-hint {
+    display: none;
+  }
+}
+
 @media (max-width: 720px) {
   .facts {
     top: auto;
@@ -414,5 +555,11 @@ button:focus-visible {
 
   .hud {
     left: 10px;
+  }
+
+  .ski-hud {
+    top: 104px;
+    left: 10px;
+    padding: 8px 12px 10px;
   }
 }

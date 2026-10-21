@@ -28,12 +28,37 @@
         <button id="sel-close" class="btn small" aria-label="Close details">Close</button>
       </aside>
 
+      <aside class="ski-hud" id="ski-hud" aria-label="Ski run telemetry" hidden>
+        <div class="ski-speed">
+          <span id="ski-speed-value">0</span><span class="ski-unit">km/h</span>
+        </div>
+        <dl class="ski-stats">
+          <div><dt>Distance</dt><dd id="ski-distance">0 m</dd></div>
+          <div><dt>Vertical</dt><dd id="ski-drop">0 m</dd></div>
+          <div><dt>Top speed</dt><dd id="ski-top">0 km/h</dd></div>
+        </dl>
+        <p class="ski-hint">
+          <span class="key">←</span> <span class="key">→</span> steer &nbsp;·&nbsp;
+          <span class="key">↑</span> tuck &nbsp;·&nbsp;
+          <span class="key">↓</span> brake &nbsp;·&nbsp; <span class="key">Esc</span> exit
+        </p>
+      </aside>
+
+      <div class="ski-touch" id="ski-touch" aria-label="Touch controls" hidden>
+        <button type="button" data-ski="left" aria-label="Steer left">◀</button>
+        <button type="button" data-ski="brake" aria-label="Brake">▼</button>
+        <button type="button" data-ski="tuck" aria-label="Tuck">▲</button>
+        <button type="button" data-ski="right" aria-label="Steer right">▶</button>
+      </div>
+
       <div class="controls" role="group" aria-label="Scene controls">
         <select id="location-select" class="select"></select>
         <select id="course-select" class="select" aria-label="Choose course" hidden></select>
         <button id="btn-play" class="btn primary">Play descent</button>
+        <button id="btn-ski" class="btn primary">Ski down</button>
         <button id="btn-pause" class="btn" aria-pressed="false" hidden>Pause</button>
         <button id="btn-exit" class="btn" hidden>Exit descent</button>
+        <button id="btn-exit-ski" class="btn" hidden>Exit ski</button>
         <button id="btn-reset" class="btn">Overview</button>
         <button id="btn-top-down" class="btn" hidden>Top-down</button>
         <button id="btn-course-start" class="btn" hidden>Course start</button>

@@ -89,6 +89,14 @@ Deliver a working, attractive browser prototype of Kitzbühel’s Streif downhil
 **Out of scope for first MVP**
 - Live lift operations, snow/weather conditions, avalanche information, route guidance, navigation, user accounts, social features, turn-by-turn directions, full global resort catalogue, photorealistic satellite texture, controllable skier/avatar, ski physics, collisions, multiplayer, native mobile app, resort data administration CMS.
 
+> **Scope update (21 Oct 2026).** The MVP shipped as specified above, with the
+> guided camera descent only. The product owner later asked for a user-steered
+> ride, so the build now also carries a **ski mode**: arrow-key steering with a
+> skier avatar, a simple edge/fall-line physics model and a chase camera. It is
+> a ride-feel feature built on the same DEM and route data, not a ski simulator:
+> no collisions, no course validation, no safety framing. Everything else in
+> the out-of-scope list still stands.
+
 ### 4.4 Functional requirements
 
 1. The scene loads a curated resort dataset and presents a usable overview without requiring the user to configure GIS data.

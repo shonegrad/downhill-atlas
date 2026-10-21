@@ -16,6 +16,7 @@ import { createScene, type FeatureInfo, type SceneHandle } from '../scene/create
 enum Mode {
   Overview = 'overview',
   Descent = 'descent',
+  Ski = 'ski',
 }
 
 const el = <T extends HTMLElement>(id: string): T => {
@@ -35,8 +36,10 @@ export async function bootApp(canvas: HTMLCanvasElement): Promise<void> {
   const hudSubtitle = document.querySelector('.subtitle') as HTMLElement | null;
 
   const btnPlay = el<HTMLButtonElement>('btn-play');
+  const btnSki = el<HTMLButtonElement>('btn-ski');
   const btnPause = el<HTMLButtonElement>('btn-pause');
   const btnExit = el<HTMLButtonElement>('btn-exit');
+  const btnExitSki = el<HTMLButtonElement>('btn-exit-ski');
   const btnReset = el<HTMLButtonElement>('btn-reset');
   const btnTopDown = el<HTMLButtonElement>('btn-top-down');
   const btnCourseStart = el<HTMLButtonElement>('btn-course-start');
@@ -47,6 +50,12 @@ export async function bootApp(canvas: HTMLCanvasElement): Promise<void> {
   const locationSelect = el<HTMLSelectElement>('location-select');
   const courseSelect = el<HTMLSelectElement>('course-select');
   const selectionPanel = el<HTMLDivElement>('selection-panel');
+  const skiHud = el<HTMLDivElement>('ski-hud');
+  const skiSpeedValue = el<HTMLSpanElement>('ski-speed-value');
+  const skiDistance = el<HTMLElement>('ski-distance');
+  const skiDrop = el<HTMLElement>('ski-drop');
+  const skiTop = el<HTMLElement>('ski-top');
+  const skiTouch = el<HTMLDivElement>('ski-touch');
 
   let mode = Mode.Overview;
   let scene: SceneHandle | null = null;
@@ -65,7 +74,7 @@ export async function bootApp(canvas: HTMLCanvasElement): Promise<void> {
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
     if (!selectionPanel.hidden) closeSelection();
-    else if (mode === Mode.Descent) setMode(Mode.Overview);
+    else if (mode === Mode.Descent || mode === Mode.Ski) setMode(Mode.Overview);
   });
 
   function closeSelection() {
@@ -123,30 +132,72 @@ export async function bootApp(canvas: HTMLCanvasElement): Promise<void> {
 
   function setMode(next: Mode) {
     mode = next;
+    appRoot.classList.toggle('skiing', next === Mode.Ski);
+    skiTouch.hidden = next !== Mode.Ski;
     if (!scene) return;
     if (next === Mode.Descent) {
       closeSelection();
       scene.startDescent(true);
       btnPlay.hidden = true;
+      btnSki.hidden = true;
       btnPause.hidden = false;
       btnExit.hidden = false;
+      btnExitSki.hidden = true;
       btnReset.hidden = true;
       btnTopDown.hidden = true;
       btnCourseStart.hidden = true;
       btnPause.setAttribute('aria-pressed', 'false');
-    } else {
-      scene.exitDescent();
-      btnPlay.hidden = false;
+      skiHud.hidden = true;
+    } else if (next === Mode.Ski) {
+      closeSelection();
+      scene.startSki();
+      btnPlay.hidden = true;
+      btnSki.hidden = true;
       btnPause.hidden = true;
       btnExit.hidden = true;
+      btnExitSki.hidden = false;
+      btnReset.hidden = true;
+      btnTopDown.hidden = true;
+      btnCourseStart.hidden = true;
+      skiHud.hidden = false;
+    } else {
+      scene.exitDescent();
+      scene.stopSki();
+      btnPlay.hidden = false;
+      btnSki.hidden = false;
+      btnPause.hidden = true;
+      btnExit.hidden = true;
+      btnExitSki.hidden = true;
       btnReset.hidden = false;
       btnTopDown.hidden = false;
       btnCourseStart.hidden = false;
       btnPlay.textContent = 'Play descent';
+      skiHud.hidden = true;
     }
   }
 
   btnPlay.addEventListener('click', () => setMode(Mode.Descent));
+  btnSki.addEventListener('click', () => setMode(Mode.Ski));
+  btnExitSki.addEventListener('click', () => setMode(Mode.Overview));
+
+  // Touch controls (phones/tablets): the same four inputs as the arrow keys.
+  for (const btn of Array.from(skiTouch.querySelectorAll('button[data-ski]'))) {
+    const control = btn.getAttribute('data-ski') as 'left' | 'right' | 'tuck' | 'brake';
+    const press = (e: Event) => {
+      e.preventDefault();
+      scene?.setSkiInput(control, true);
+      btn.classList.add('pressed');
+    };
+    const release = (e: Event) => {
+      e.preventDefault();
+      scene?.setSkiInput(control, false);
+      btn.classList.remove('pressed');
+    };
+    btn.addEventListener('pointerdown', press);
+    btn.addEventListener('pointerup', release);
+    btn.addEventListener('pointercancel', release);
+    btn.addEventListener('pointerleave', release);
+  }
   btnExit.addEventListener('click', () => setMode(Mode.Overview));
   btnReset.addEventListener('click', () => scene?.resetView());
   btnTopDown.addEventListener('click', () => scene?.presetTopDown());
@@ -411,7 +462,7 @@ export async function bootApp(canvas: HTMLCanvasElement): Promise<void> {
   }
 
   async function switchCourse(course: CourseSummary, manifest: ManifestAsset) {
-    if (mode === Mode.Descent) setMode(Mode.Overview);
+    if (mode === Mode.Descent || mode === Mode.Ski) setMode(Mode.Overview);
     closeSelection();
     // reflect selection immediately; data fetch follows
     const url = new URL(location.href);
@@ -461,6 +512,12 @@ export async function bootApp(canvas: HTMLCanvasElement): Promise<void> {
       onFeatureSelect: (id) => {
         if (id) openSelection(id);
         else closeSelection();
+      },
+      onSkiStats: (stats) => {
+        skiSpeedValue.textContent = String(Math.round(stats.speedKmh));
+        skiDistance.textContent = `${Math.round(stats.distanceM).toLocaleString()} m`;
+        skiDrop.textContent = `${Math.round(stats.dropM).toLocaleString()} m`;
+        skiTop.textContent = `${Math.round(stats.topSpeedKmh)} km/h`;
       },
     });
     (window as unknown as Record<string, unknown>).__downhillScene = scene;

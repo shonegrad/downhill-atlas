@@ -150,6 +150,31 @@ for (const loc of ['streif', 'kopaonik']) {
     180000, `[${loc}] descent never returned to overview`);
   await page.screenshot({ path: `${OUT}/${loc}-6-after-descent.png` });
 
+  // ski mode: enter, steer, brake, and confirm the telemetry moves
+  await page.click('#btn-ski');
+  await new Promise((r) => setTimeout(r, 2500));
+  const skiHudVisible = await page.$eval('#ski-hud', (n) => !n.hidden);
+  if (!skiHudVisible) report(`[${loc}] ski HUD not visible after starting the ski run`);
+  await page.keyboard.down('ArrowRight');
+  await new Promise((r) => setTimeout(r, 1500));
+  await page.keyboard.up('ArrowRight');
+  await page.keyboard.down('ArrowUp'); // tuck
+  await new Promise((r) => setTimeout(r, 2500));
+  await page.keyboard.up('ArrowUp');
+  const ski = await page.evaluate(() => ({
+    speed: Number(document.getElementById('ski-speed-value')?.textContent ?? 0),
+    distance: document.getElementById('ski-distance')?.textContent ?? '',
+  }));
+  console.log(`    ski run: ${ski.speed} km/h, ${ski.distance}`);
+  if (!(ski.speed > 5)) report(`[${loc}] skier never got up to speed (${ski.speed} km/h)`);
+  await page.screenshot({ path: `${OUT}/${loc}-7-ski.png` });
+  await page.click('#btn-exit-ski');
+  await new Promise((r) => setTimeout(r, 800));
+  const skiClosed = await page.$eval('#ski-hud', (n) => n.hidden);
+  if (!skiClosed) report(`[${loc}] ski HUD still visible after exiting the ski run`);
+  const playBack = await page.$eval('#btn-play', (n) => !n.hidden);
+  if (!playBack) report(`[${loc}] play button not restored after exiting the ski run`);
+
   if (errors.length) {
     report(`[${loc}] ${errors.length} page error(s): ${errors.slice(0, 6).join(' | ')}`);
   } else {

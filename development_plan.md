@@ -32,7 +32,10 @@ See [research_brief_brd.md](research_brief_brd.md) for research, product rationa
 
 ### Out of scope
 
-- User-steered skiing, skier avatar, physics, collisions, multiplayer.
+- ~~User-steered skiing, skier avatar, physics, collisions, multiplayer.~~
+  **Extended in v0.5** (see the v0.5 addendum): user-steered skiing, a skier
+  avatar and a simple physics model are now in. Collisions, multiplayer and
+  course validation stay out of scope.
 - Live resort operations, snow/weather, avalanche conditions, navigation, or safety recommendations.
 - Full Kitzbühel resort coverage or multi-resort search.
 - CMS, accounts, server API, user submissions, or live data refresh.
@@ -294,8 +297,52 @@ Two visual changes requested after the v0.3 round shipped:
    lifts are thin lines" to "other pistes are coloured bands; lifts are thin
    lines".
 
-## Reference facts and sources
+## Plan v0.5 addendum — user-steered ski mode (21 Oct 2026)
 
+The product owner asked for a ride you drive yourself, not just watch. The
+guided descent stays; **ski mode** is a second entry point next to it.
+
+### A. The ride
+1. **"Ski down" button** (`btn-ski`) starts a run at the race start of the
+   featured course. `Esc` or "Exit ski" returns to the overview. The guided
+   descent is untouched.
+2. **Controls** — `←`/`→` steer, `↑` tucks (less drag), `↓` checks speed
+   (brake + skid). On touch devices the same four inputs are on-screen pads
+   (`#ski-touch`, shown for coarse pointers).
+3. **Physics** (`src/scene/skiRide.ts`) — the classic "skate" model: the ski
+   can only travel along its heading, gravity always pulls down the fall
+   line, and sideways velocity is scrubbed by the edges. Constants: g = 9.81,
+   snow friction µ = 0.055, air drag 0.0032 (upright) / 0.0022 (tucked),
+   edge angle 0.8 rad, edge grip 4.2 /s, brake 6 m/s², speed cap 40 m/s.
+   Turn rate comes from the real carving relation R = v²/(g·tan(edge)), so
+   speed and steering are coupled (faster = wider arc). The edge has a finite
+   grip limit; past it the ski breaks away into a skid. With no steering input
+   the skier drifts back onto the fall line (0.45 rad/s), the way a real skier
+   straightens out.
+4. **Feel** — chase camera 12 m behind / 3.6 m above, banked into the turn,
+   FOV opening 55°→70° with speed, skier avatar (skis, boots, suit, helmet)
+   leaning with the edge angle, and a ski track ribbon drawn on the snow
+   behind. The camera samples the terrain along the sight line so a roll never
+   swallows the camera.
+5. **Telemetry HUD** — speed (km/h), distance, vertical drop, top speed. The
+   run uses **natural relief** (vertical scale 1.0, not the 1.5 descent
+   boost): the physics use the real DEM slope, so an exaggerated mountain
+   would make the skier look slower than the hill.
+6. **Numbers that came out of it** (deterministic harness, `dt = 1/60`):
+   straight down the Streif the skier reaches 104 km/h in 9 s and peaks at
+   ~128 km/h; tucking adds ~10 %; a full-lock carve at 100 km/h costs
+   ~1 m/s² of speed; a full brake sheds ~6 m/s².
+
+### B. Notes
+- The skier and the track live in the scene root, not the terrain group, so
+  the vertical exaggeration does not stretch the avatar; their heights are
+  scaled by hand.
+- The skier is clamped 30 m inside the AOI (the DEM is clamped at the border,
+  so without this you would ride on an invisible flat shelf).
+- Piste picking still works in overview mode; the scene ignores pointer
+  picking while a run is live.
+
+## Reference facts and sources
 - Official Streif downhill profile: 3,312 m course length and 860 m vertical drop ([Hahnenkamm official page](https://web1.hahnenkamm.com/en/racetracks/the-streif-downhill/)).
 - Official 2026 course facts PDF ([Hahnenkamm Races](https://cdn.hahnenkamm.com/site/assets/files/29082/kenndaten-hkr-2026_en.pdf)).
 - Terrain, piste data, sources, licensing, and rendering comparisons: see [research_brief_brd.md](research_brief_brd.md).

@@ -5,6 +5,7 @@ import { buildTerrain, repaintByNormals } from './terrainMesh';
 import { applyHighlight, buildContextFeatures, buildFeaturedCourse, setFeaturedDescentFade, type FeatureRecord } from './routeLayer';
 import { buildLandmarks, type LandmarkLayer } from './labels';
 import { DescentController } from './descent';
+import { SkiRideController, type SkiInput, type SkiStats } from './skiRide';
 import { SKY_COLOR, sampleTerrain } from './coordinates';
 
 export interface FeatureInfo {
@@ -23,6 +24,7 @@ export interface SceneCallbacks {
   onDescentEnd: () => void;
   onFeatureHover: (featureId: string | null) => void;
   onFeatureSelect: (featureId: string | null) => void;
+  onSkiStats?: (stats: SkiStats) => void;
 }
 
 export interface SceneHandle {
@@ -31,12 +33,17 @@ export interface SceneHandle {
     scene: THREE.Scene;
     camera: THREE.PerspectiveCamera;
     course: () => { group: THREE.Group };
+    ski: () => SkiRideController;
   };
   startDescent: (fromBeginning: boolean) => void;
   pauseDescent: () => void;
   resumeDescent: () => void;
   exitDescent: () => void;
   descentActive: () => boolean;
+  startSki: () => void;
+  stopSki: () => void;
+  skiActive: () => boolean;
+  setSkiInput: (control: 'left' | 'right' | 'tuck' | 'brake', pressed: boolean) => void;
   verticalScale: () => number;
   setVerticalScale: (scale: number) => void;
   resetView: () => void;
@@ -217,6 +224,46 @@ export function createScene(canvas: HTMLCanvasElement, data: Dataset, callbacks:
     });
   }
 
+  // --- ski ride ------------------------------------------------------------------
+  // The skier and its track live in the scene root (not the terrain group) so
+  // the vertical exaggeration does not stretch the avatar; their heights are
+  // scaled by hand instead.
+  let ski = new SkiRideController(terrain, route);
+  scene.add(ski.track);
+  scene.add(ski.skier);
+  ski.skier.visible = false;
+
+  const skiInput: SkiInput = { left: false, right: false, tuck: false, brake: false };
+  const SKI_KEYS: Record<string, keyof SkiInput> = {
+    ArrowLeft: 'left',
+    ArrowRight: 'right',
+    ArrowUp: 'tuck',
+    ArrowDown: 'brake',
+  };
+
+  function onKeyDown(e: KeyboardEvent) {
+    const key = SKI_KEYS[e.key];
+    if (!key) return;
+    // Arrows drive the skier; stop the page from scrolling under them.
+    e.preventDefault();
+    skiInput[key] = true;
+  }
+  function onKeyUp(e: KeyboardEvent) {
+    const key = SKI_KEYS[e.key];
+    if (!key) return;
+    e.preventDefault();
+    skiInput[key] = false;
+  }
+  function releaseSkiInput() {
+    skiInput.left = false;
+    skiInput.right = false;
+    skiInput.tuck = false;
+    skiInput.brake = false;
+  }
+  window.addEventListener('keydown', onKeyDown);
+  window.addEventListener('keyup', onKeyUp);
+  window.addEventListener('blur', releaseSkiInput);
+
   function disposeObject(obj: THREE.Object3D) {
     obj.traverse((child) => {
       const mesh = child as THREE.Mesh;
@@ -229,6 +276,7 @@ export function createScene(canvas: HTMLCanvasElement, data: Dataset, callbacks:
 
   function swapRoute(next: RouteAsset) {
     if (descent.isPlaying()) descent.stop();
+    if (ski.isRunning()) ski.stop();
     terrainGroup.remove(course.group);
     disposeObject(course.group);
     landmarks?.host.remove();
@@ -239,6 +287,14 @@ export function createScene(canvas: HTMLCanvasElement, data: Dataset, callbacks:
     landmarks = buildLandmarks(terrain, route);
     landmarksOn = !!landmarks;
     descent = makeDescent(route);
+    disposeObject(ski.skier);
+    disposeObject(ski.track);
+    scene.remove(ski.track);
+    scene.remove(ski.skier);
+    ski = new SkiRideController(terrain, route);
+    scene.add(ski.track);
+    scene.add(ski.skier);
+    ski.skier.visible = false;
     rebuildFeatureIndex();
     if (selectedId) selectedId = null;
     hoveredId = null;
@@ -254,7 +310,7 @@ export function createScene(canvas: HTMLCanvasElement, data: Dataset, callbacks:
   });
 
   canvas.addEventListener('pointermove', (e) => {
-    if (descent.isPlaying()) return;
+    if (descent.isPlaying() || ski.isRunning()) return;
     if (downPos && (Math.abs(e.clientX - downPos.x) > 6 || Math.abs(e.clientY - downPos.y) > 6)) {
       dragging = true;
     }
@@ -269,7 +325,7 @@ export function createScene(canvas: HTMLCanvasElement, data: Dataset, callbacks:
   });
 
   canvas.addEventListener('pointerup', (e) => {
-    if (descent.isPlaying() || dragging || !downPos) {
+    if (descent.isPlaying() || ski.isRunning() || dragging || !downPos) {
       downPos = null;
       return;
     }
@@ -284,27 +340,44 @@ export function createScene(canvas: HTMLCanvasElement, data: Dataset, callbacks:
   let last = performance.now();
   let sceneryFade = 0;
   let sceneryApplied = -1;
+  let skiStatsClock = 0;
 
   function loop(now: number) {
     raf = requestAnimationFrame(loop);
     const dt = Math.min((now - last) / 1000, 0.1);
     last = now;
     const descending = descent.isPlaying();
+    const skiing = ski.isRunning();
 
-    // vertical scale + fov glide between overview and the ski-cam profile
-    const scaleTarget = descending ? Math.max(reliefUser, DESCENT_SCALE_BOOST) : reliefUser;
+    // vertical scale + fov glide between overview and the ski-cam profile.
+    // Ski mode runs at natural relief: the physics use the real DEM slope, so
+    // an exaggerated mountain would make the skier look slower than the hill.
+    const scaleTarget = skiing
+      ? 1
+      : descending
+        ? Math.max(reliefUser, DESCENT_SCALE_BOOST)
+        : reliefUser;
     if (Math.abs(scaleTarget - scale.value) > 1e-4) {
       scale.value +=
         (scaleTarget - scale.value) * Math.min(1, 1 - Math.exp(-DESCENT_SCALE_RAMP * dt));
       applyScale();
     }
+    // The ski camera drives its own fov (it opens up with speed).
     const fovTarget = descending ? DESCENT_FOV : BASE_FOV;
-    if (Math.abs(fovTarget - camera.fov) > 1e-3) {
+    if (!skiing && Math.abs(fovTarget - camera.fov) > 1e-3) {
       camera.fov += (fovTarget - camera.fov) * Math.min(1, 1 - Math.exp(-DESCENT_SCALE_RAMP * dt));
       camera.updateProjectionMatrix();
     }
 
-    if (descending) {
+    if (skiing) {
+      controls.enabled = false;
+      ski.update(dt, camera, skiInput, scale.value);
+      skiStatsClock += dt;
+      if (skiStatsClock > 0.1) {
+        skiStatsClock = 0;
+        callbacks.onSkiStats?.(ski.getStats());
+      }
+    } else if (descending) {
       controls.enabled = false;
       descent.update(dt, camera, scale.value);
     } else {
@@ -312,11 +385,12 @@ export function createScene(canvas: HTMLCanvasElement, data: Dataset, callbacks:
       controls.update();
     }
     if (landmarks) {
-      landmarks.setVisible(landmarksOn && !descending);
+      landmarks.setVisible(landmarksOn && !descending && !skiing);
       landmarks.update(camera);
     }
     // scenery fade eases with the same ramp as the scale/fov glide
-    sceneryFade += ((descending ? 1 : 0) - sceneryFade) * Math.min(1, 1 - Math.exp(-2.5 * dt));
+    const sceneryTarget = descending || skiing ? 1 : 0;
+    sceneryFade += (sceneryTarget - sceneryFade) * Math.min(1, 1 - Math.exp(-2.5 * dt));
     if (Math.abs(sceneryFade - sceneryApplied) > 0.015 || (sceneryFade < 0.001) !== (sceneryApplied < 0.001)) {
       sceneryApplied = sceneryFade;
       setFeaturedDescentFade(course.group, sceneryFade);
@@ -343,6 +417,7 @@ export function createScene(canvas: HTMLCanvasElement, data: Dataset, callbacks:
       scene,
       camera,
       course: () => course,
+      ski: () => ski,
     },
     startDescent: (fromBeginning: boolean) => {
       descent.captureBlend(camera);
@@ -359,6 +434,24 @@ export function createScene(canvas: HTMLCanvasElement, data: Dataset, callbacks:
       presetOverview();
     },
     descentActive: () => descent.isPlaying(),
+    startSki: () => {
+      if (descent.isPlaying()) descent.stop();
+      releaseSkiInput();
+      ski.start(camera);
+      canvas.style.cursor = '';
+      callbacks.onFeatureHover(null);
+      hoveredId = null;
+    },
+    stopSki: () => {
+      ski.stop();
+      ski.skier.visible = false;
+      releaseSkiInput();
+      controls.enabled = true;
+    },
+    skiActive: () => ski.isRunning(),
+    setSkiInput: (control, pressed) => {
+      skiInput[control] = pressed;
+    },
     verticalScale: () => reliefUser,
     setVerticalScale: (next: number) => {
       reliefUser = next;
@@ -403,6 +496,9 @@ export function createScene(canvas: HTMLCanvasElement, data: Dataset, callbacks:
     },
     dispose: () => {
       window.removeEventListener('resize', resize);
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', releaseSkiInput);
       cancelAnimationFrame(raf);
       landmarks?.host.remove();
       controls.dispose();
