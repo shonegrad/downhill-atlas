@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23e63b2f' rx='3'/%3E%3C/svg%3E" />
+    <meta name="description" content="Downhill Atlas — 3D explorer for alpine downhill courses (visualization prototype)." />
+    <title>Downhill Atlas</title>
+  </head>
+  <body>
+    <div id="app" class="app">
+      <canvas id="scene" aria-label="Interactive 3D view of the Streif downhill course"></canvas>
+
+      <header class="hud">
+        <h1>Downhill Atlas</h1>
+        <p class="subtitle">Streif, Kitzbühel — 3D visualization prototype</p>
+      </header>
+
+      <aside class="facts panel" id="facts" aria-label="Course facts">
+        <h2>Facts</h2>
+      </aside>
+
+      <aside class="legend panel" id="legend" aria-label="Legend">
+        <h2>Legend</h2>
+      </aside>
+
+      <aside class="selection panel" id="selection-panel" aria-label="Selected feature details" hidden>
+        <button id="sel-close" class="btn small" aria-label="Close details">Close</button>
+      </aside>
+
+      <div class="controls" role="group" aria-label="Scene controls">
+        <select id="location-select" class="select"></select>
+        <button id="btn-play" class="btn primary">Play descent</button>
+        <button id="btn-pause" class="btn" aria-pressed="false" hidden>Pause</button>
+        <button id="btn-exit" class="btn" hidden>Exit descent</button>
+        <button id="btn-reset" class="btn">Overview</button>
+        <button id="btn-top-down" class="btn" hidden>Top-down</button>
+        <button id="btn-course-start" class="btn" hidden>Course start</button>
+        <button id="btn-landmarks" class="btn" aria-pressed="true" hidden>Landmarks: on</button>
+        <button id="btn-relief" class="btn" aria-pressed="false">Relief: natural</button>
+        <button id="btn-info" class="btn" aria-haspopup="dialog">Data &amp; attribution</button>
+      </div>
+
+      <dialog id="info-dialog" class="manifest" aria-label="Data and attribution">
+        <div class="manifest-scroll">
+          <div id="manifest-content"></div>
+        </div>
+        <form method="dialog" class="manifest-actions">
+          <button class="btn" value="close">Close</button>
+        </form>
+      </dialog>
+
+      <div id="loading" class="status" aria-live="polite">Loading terrain…</div>
+      <div id="error" class="status status-error" role="alert" hidden></div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

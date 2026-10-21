@@ -1,0 +1,24 @@
+{
+  "name": "downhill-atlas",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Downhill Atlas — 3D mountain & ski resort explorer. MVP: the Streif downhill, Kitzbühel.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "qa": "node scripts/qa-smoke.mjs",
+    "prep:data": "node scripts/data-prep/build-assets.mjs"
+  },
+  "dependencies": {
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "@types/three": "^0.186.0",
+    "pngjs": "^7.0.0",
+    "puppeteer-core": "^24.43.1",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.4"
+  }
+}

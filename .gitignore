@@ -1,0 +1,5 @@
+node_modules/
+dist/
+scripts/data-prep/raw/
+.DS_Store
+*.log
