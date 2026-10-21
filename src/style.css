@@ -3,6 +3,7 @@
   --paper: rgba(255, 255, 255, 0.88);
   --line: #c8d2da;
   --accent: #d3382f;
+  --featured: #ffb100;
   --focus: #1b6ec2;
   --radius: 10px;
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
@@ -153,7 +154,7 @@ body {
 }
 
 .swatch-featured {
-  background: var(--accent);
+  background: var(--featured);
   box-shadow: 0 1px 0 #21242a;
   height: 8px;
 }

@@ -95,8 +95,9 @@ without silently re-drawing OSM:
 - **M3 handoff/publishing** — done. Docs (this file, README), relativity of all paths
   verified on a nested subpath, GitHub Pages workflow live, attribution visible in-app.
 - **Plan v0.2 round** — done. Curated course layer + Pančićev vrh switchable course;
-  descent smoothing (damped height/look, ease-in blend, smoothed camera path);
-  ribbon thinner (2.5 → 1.9 m half-width); landmark decluttering; `?course=` deep links.
+  descent smoothing (damped full pose, ease-in blend, smoothed camera path) with
+  piste-scale draped featured band (amber, non-red), terrain edge feathering;
+  landmark decluttering; `?course=` deep links.
 
 QA (`npm run qa`) passes for both locations with zero console errors, including course
 switching at Kopaonik and the `?loc=kopaonik&course=pancic-vrh` deep link.
@@ -118,12 +119,16 @@ switching at Kopaonik and the `?loc=kopaonik&course=pancic-vrh` deep link.
 
 ## Maintenance quicknotes
 
-- To change visual palette: `src/scene/terrainMesh.ts` (grayscale ramp), `routeLayer.ts`
-  (`PISTE_COLORS`), `style.css` swatches — keep swatches and scene colors in sync.
-- To change the descent feel: `descent.ts` constants (`CAM_OFFSET_M`, `LOOK_AHEAD_M`,
-  `HEIGHT_DAMPING`, `LOOK_DAMPING`, `BLEND_SECONDS`, `EASE_WINDOW`); base timing per course
-  is `route.descentDurationSeconds`, stamped by `assemble-route.mjs` from route length;
-  reduced-motion doubles it at runtime.
+- To change visual palette: `src/scene/terrainMesh.ts` (grayscale ramp + border
+  feather width `FADE_FRACTION`), `routeLayer.ts` (`PISTE_COLORS`;
+  `FEATURED_COLOR` amber is reserved for the featured course — do not reuse
+  difficulty hues), `src/style.css` (`--featured` swatch; keep in sync), and
+  the favicon in `index.html`.
+- Descent feel constants: `descent.ts` (`CAM_OFFSET_M` 50, `LOOK_AHEAD_M` 120,
+  `POSITION_DAMPING`, `LOOK_DAMPING`, `BLEND_SECONDS`, `EASE_WINDOW`); featured
+  band width caps live in `routeLayer.ts` (`halfWidth` = min 12 m); base timing
+  per course is `route.descentDurationSeconds`, stamped by `assemble-route.mjs`
+  from route length; reduced-motion doubles it at runtime.
 - Curated courses live in two places: the input (`scripts/data-prep/curated/...`, reviewed
   provenance) and the generated `public/data/<id>/routes/<course>.json`. Edit the input,
   re-run `npm run prep:data -- <id>`; never hand-edit the generated files.

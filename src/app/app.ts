@@ -384,15 +384,7 @@ export async function bootApp(canvas: HTMLCanvasElement): Promise<void> {
   async function switchCourse(course: CourseSummary, manifest: ManifestAsset) {
     if (mode === Mode.Descent) setMode(Mode.Overview);
     closeSelection();
-    const route = await loadRoute(`./data/${activeDir}`, course.file);
-    currentRoute = route;
-    routeName = route.name;
-    routeDifficulty = route.difficulty ?? null;
-    scene?.swapRoute(route);
-    courseSelect.value = course.id;
-    visibleLayers.add('featured');
-    fillPanels(manifest, route);
-    fillLegend();
+    // reflect selection immediately; data fetch follows
     const url = new URL(location.href);
     if (course.isDefault) {
       url.searchParams.delete('course');
@@ -400,6 +392,15 @@ export async function bootApp(canvas: HTMLCanvasElement): Promise<void> {
       url.searchParams.set('course', course.id);
     }
     history.replaceState(null, '', url.toString());
+    courseSelect.value = course.id;
+    const route = await loadRoute(`./data/${activeDir}`, course.file);
+    currentRoute = route;
+    routeName = route.name;
+    routeDifficulty = route.difficulty ?? null;
+    scene?.swapRoute(route);
+    visibleLayers.add('featured');
+    fillPanels(manifest, route);
+    fillLegend();
   }
 
   try {

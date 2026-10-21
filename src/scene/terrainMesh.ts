@@ -16,13 +16,34 @@ const PALETTE = [
 const ROCK = new THREE.Color('#767676');
 const SNOW = new THREE.Color('#f3f3f3');
 
+// Border feather: fraction of the smaller grid dimension over which the mesh
+// alpha-fades to nothing, so the terrain dissolves into sky haze instead of
+// ending on a hard edge.
+const FADE_FRACTION = 0.16;
+
+function borderFadeRamp(t: TerrainAsset): Float32Array {
+  const nx = t.nx;
+  const ny = t.ny;
+  const ramp = new Float32Array(nx * ny);
+  const fade = Math.max(2, Math.round(Math.min(nx, ny) * FADE_FRACTION));
+  for (let j = 0; j < ny; j++) {
+    const edgeDist = Math.min(j, ny - 1 - j);
+    for (let i = 0; i < nx; i++) {
+      const dist = Math.min(edgeDist, i, nx - 1 - i);
+      ramp[j * nx + i] = smoothstep(0, fade, dist);
+    }
+  }
+  return ramp;
+}
+
 export function buildTerrain(t: TerrainAsset): THREE.Mesh {
   const nx = t.nx;
   const ny = t.ny;
   const spacing = t.spacing;
   const count = nx * ny;
   const positions = new Float32Array(count * 3);
-  const colors = new Float32Array(count * 3);
+  const colors = new Float32Array(count * 4);
+  const fade = borderFadeRamp(t);
   const c = new THREE.Color();
 
   for (let j = 0; j < ny; j++) {
@@ -39,9 +60,11 @@ export function buildTerrain(t: TerrainAsset): THREE.Mesh {
 
       const f = (h - t.elevationMin) / (t.elevationMax - t.elevationMin || 1);
       paletteLerp(c, f);
-      colors[k * 3] = c.r;
-      colors[k * 3 + 1] = c.g;
-      colors[k * 3 + 2] = c.b;
+      const k4 = k * 4;
+      colors[k4] = c.r;
+      colors[k4 + 1] = c.g;
+      colors[k4 + 2] = c.b;
+      colors[k4 + 3] = fade[k];
     }
   }
 
@@ -58,7 +81,7 @@ export function buildTerrain(t: TerrainAsset): THREE.Mesh {
 
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 4));
   geo.setIndex(indices);
   geo.computeVertexNormals();
 
@@ -66,6 +89,7 @@ export function buildTerrain(t: TerrainAsset): THREE.Mesh {
     vertexColors: true,
     roughness: 0.96,
     metalness: 0,
+    transparent: true,
   });
 
   const mesh = new THREE.Mesh(geo, material);
@@ -104,7 +128,7 @@ export function repaintByNormals(t: TerrainAsset, mesh: THREE.Mesh): void {
     const h = posAttr.getY(k) + t.elevationMin;
     const snowMix = smoothstep(1520, 1620, h);
     if (snowMix > 0) tmp.lerp(SNOW, snowMix * 0.9);
-    colAttr.setXYZ(k, tmp.r, tmp.g, tmp.b);
+    colAttr.setXYZW(k, tmp.r, tmp.g, tmp.b, colAttr.getW(k));
   }
   colAttr.needsUpdate = true;
 }

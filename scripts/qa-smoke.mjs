@@ -93,7 +93,8 @@ for (const loc of ['streif', 'kopaonik']) {
   if (coursesVisible) {
     const factsBefore = await page.$eval('#facts', (n) => n.textContent);
     await page.select('#course-select', await page.$eval('#course-select', (n) => n.options[n.options.length - 1].value));
-    await new Promise((r) => setTimeout(r, 800));
+    await page.waitForFunction(() => new URLSearchParams(location.search).get('course'), { timeout: 15000 });
+    await new Promise((r) => setTimeout(r, 400));
     const factsAfter = await page.$eval('#facts', (n) => n.textContent);
     if (factsBefore === factsAfter) report(`[${loc}] facts panel unchanged after course switch`);
     const legendAfter = await page.$eval('#legend', (n) => n.textContent);
@@ -103,7 +104,8 @@ for (const loc of ['streif', 'kopaonik']) {
     await page.screenshot({ path: `${OUT}/${loc}-2b-second-course.png` });
     // switch back to the default course
     await page.select('#course-select', await page.$eval('#course-select', (n) => n.options[0].value));
-    await new Promise((r) => setTimeout(r, 800));
+    await page.waitForFunction(() => !new URLSearchParams(location.search).get('course'), { timeout: 15000 });
+    await new Promise((r) => setTimeout(r, 400));
     const url = await page.url();
     if (url.includes('course=')) report(`[${loc}] ?course param not cleared when returning to default course`);
   }
@@ -145,7 +147,7 @@ for (const loc of ['streif', 'kopaonik']) {
 
 // fresh user path: default URL, no ?loc
 const page = await browser.newPage();
-await page.goto(BASE + '/', { waitUntil: 'networkidle0' });
+await page.goto(BASE + '/', { waitUntil: 'networkidle0', timeout: 60000 });
 const selectValue = await page.$eval('#location-select', (n) => n.value);
 console.log(`default location selected: ${selectValue}`);
 if (!selectValue) report('location select empty on default URL');

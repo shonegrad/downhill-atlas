@@ -179,15 +179,23 @@ Implemented in this phase:
    provenance.
 
 ### B. Visual polish (done)
-1. **Descent smoothness** — camera height follows a lightly smoothed elevation
-   profile (ribbon stays on the raw DEM line), exponentially damped towards
-   `terrain + offset` (no more per-frame snapping over DEM ridges); the look target
-   is damped at a fixed 88 m lookahead; a ~1 s ease-in flies the camera from the
-   orbit pose into the ride; cruise speed is constant with smooth windows at the
-   ends; the finish triggers the existing auto-return to overview.
-2. **Ribbon width** — featured half-width reduced 2.5 → 1.9 m so it reads less
-   road-like at descent range.
-3. **Label decluttering** — screen-space culling in route order (crowded Streif
+1. **Descent smoothness** — camera rides a lightly smoothed elevation profile
+   (ribbon stays on the raw DEM line); the full camera pose is exponentially
+   damped (position + look target at a fixed 120 m lookahead), flattening both
+   elevation steps over DEM ridges and lateral kinks in the sampled line; a ~1 s
+   ease-in flies the camera from the orbit pose into the ride; cruise speed is
+   constant with smooth windows at the ends; the finish triggers the existing
+   auto-return to overview.
+2. **Featured course as a piste-scale band** — the ribbon was rebuilt as a
+   ~24 m wide groomed-slope band (AOI-relative cap), draped per-vertex onto the
+   terrain at four stations across its width (no floating/clipping on side
+   slopes), with a dark underneath pass as the non-color edge cue.
+3. **Featured color** — amber/gold (`#ffb100`, scene + legend swatch + facts
+   labels); red-family hues stay exclusive to piste difficulty classes.
+4. **Terrain edge feathering** — the mesh alpha-fades into the sky over the
+   outer ~16% of the AOI on every side, so terrain borders dissolve into fog
+   instead of ending on a hard cut.
+5. **Label decluttering** — screen-space culling in route order (crowded Streif
    start sections no longer overlap).
 
 ### C. Backlog (prioritized; next up = 1)

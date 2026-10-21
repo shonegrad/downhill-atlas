@@ -2,8 +2,6 @@ import * as THREE from 'three';
 import type { RouteAsset, FeatureAsset, TerrainAsset } from '../data/loader';
 import { sampleTerrain } from './coordinates';
 
-const ROUTE_OFFSET_M = 1;
-
 export interface FeatureRecord {
   id: string;
   kind: 'featured' | 'piste' | 'lift';
@@ -25,7 +23,9 @@ export interface FeatureContext {
   layers: Set<string>;
 }
 
-const FEATURED_COLOR = 0xe63b2f;
+// Amber/gold is reserved for the featured course; red-family hues stay
+// exclusive to piste difficulty classes so they never read as "hardness".
+const FEATURED_COLOR = 0xffb100;
 const FEATURED_EDGE_COLOR = 0x22252a;
 const LIFT_COLOR = 0x56606a;
 
@@ -59,23 +59,27 @@ function polylineStats(t: TerrainAsset, points: number[][]) {
 export function buildFeaturedCourse(t: TerrainAsset, route: RouteAsset): { group: THREE.Group; entry: FeatureRecord; pickables: THREE.Object3D[] } {
   const group = new THREE.Group();
   const pts = route.points;
-  // Thinner profile so the ribbon reads as a course line rather than a road
-  // at descent-camera range (was 2.5).
-  const halfWidth = 1.9;
+  // Real-piste scale: groomed runs are ~24-30 m across. AOI-relative cap keeps
+  // the band sane on any future AOI size.
+  const diag = Math.hypot(t.eastMeters, t.northMeters);
+  const halfWidth = Math.min(12, Math.max(6, diag * 0.003));
 
-  const center: THREE.Vector3[] = [];
-  const side: THREE.Vector3[] = [];
+  // Plate direction (perpendicular in plan) per station.
+  const dirSide: { sx: number; sy: number }[] = [];
   for (let k = 0; k < pts.length; k++) {
-    const [e, n] = pts[k];
     const prev = pts[Math.max(k - 1, 0)];
     const next = pts[Math.min(k + 1, pts.length - 1)];
     const dx = next[0] - prev[0];
     const dn = next[1] - prev[1];
     const len = Math.hypot(dx, dn) || 1;
-    const sx = (-dn / len) * halfWidth;
-    const sy = (dx / len) * halfWidth;
-    center.push(new THREE.Vector3(e, sampleTerrain(t, e, n) - t.elevationMin + ROUTE_OFFSET_M, -n));
-    side.push(new THREE.Vector3(sx, 0, -sy));
+    dirSide.push({ sx: -dn / len, sy: dx / len });
+  }
+
+  // Columns across the band; each vertex is clamped to the terrain at its own
+  // plan position so the surface follows roll across the slope instead of
+  // floating above it or clipping into it.
+  function surfaceY(east: number, north: number, lift: number): number {
+    return sampleTerrain(t, east, north) - t.elevationMin + lift;
   }
 
   const record: FeatureRecord = {
@@ -98,30 +102,44 @@ export function buildFeaturedCourse(t: TerrainAsset, route: RouteAsset): { group
     lift: number,
     renderOrder: number,
   ) => {
-    const positions = new Float32Array(pts.length * 6);
+    const cols = 4;
+    const positions = new Float32Array(pts.length * cols * 3);
     for (let k = 0; k < pts.length; k++) {
-      const c = center[k];
-      const s = side[k].clone().multiplyScalar(widthScale);
-      positions[k * 6] = c.x - s.x;
-      positions[k * 6 + 1] = c.y + lift;
-      positions[k * 6 + 2] = c.z - s.z;
-      positions[k * 6 + 3] = c.x + s.x;
-      positions[k * 6 + 4] = c.y + lift;
-      positions[k * 6 + 5] = c.z + s.z;
+      const [e, n] = pts[k];
+      const { sx, sy } = dirSide[k];
+      const hw = halfWidth * widthScale;
+      for (let cIdx = 0; cIdx < cols; cIdx++) {
+        const f = (cIdx / (cols - 1)) * 2 - 1;
+        const off = f * hw;
+        const px = e + sx * off;
+        const py = n + sy * off;
+        const i3 = (k * cols + cIdx) * 3;
+        positions[i3] = px;
+        positions[i3 + 1] = surfaceY(px, py, lift);
+        positions[i3 + 2] = -py;
+      }
     }
     const indices: number[] = [];
     for (let k = 0; k < pts.length - 1; k++) {
-      const a = k * 2;
-      const b = k * 2 + 1;
-      const c2 = k * 2 + 2;
-      const d = k * 2 + 3;
-      indices.push(a, c2, b, b, c2, d);
+      for (let cIdx = 0; cIdx < cols - 1; cIdx++) {
+        const a = k * cols + cIdx;
+        const b = a + 1;
+        const c2 = (k + 1) * cols + cIdx;
+        const d = c2 + 1;
+        indices.push(a, c2, b, b, c2, d);
+      }
     }
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     geo.setIndex(indices);
     geo.computeVertexNormals();
-    const mat = new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide });
+    const mat = new THREE.MeshBasicMaterial({
+      color,
+      side: THREE.DoubleSide,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+      polygonOffsetUnits: -2,
+    });
     mat.depthWrite = true;
     const mesh = new THREE.Mesh(geo, mat);
     mesh.renderOrder = renderOrder;
@@ -132,8 +150,8 @@ export function buildFeaturedCourse(t: TerrainAsset, route: RouteAsset): { group
     return mesh;
   };
 
-  group.add(ribbonMesh(1.25, FEATURED_EDGE_COLOR, -0.35, 3));
-  group.add(ribbonMesh(1.0, FEATURED_COLOR, 0.68, 4));
+  group.add(ribbonMesh(1.18, FEATURED_EDGE_COLOR, 0.5, 3));
+  group.add(ribbonMesh(1.0, FEATURED_COLOR, 2, 4));
   group.visible = true;
 
   return { group, entry: record, pickables };

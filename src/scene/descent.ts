@@ -2,10 +2,11 @@ import * as THREE from 'three';
 import type { RouteAsset, TerrainAsset } from '../data/loader';
 import { sampleTerrain } from './coordinates';
 
-const CAM_OFFSET_M = 32;
-const LOOK_AHEAD_M = 88;
+const CAM_OFFSET_M = 50;
+const LOOK_AHEAD_M = 120;
 const BLEND_SECONDS = 1;
 const HEIGHT_DAMPING = 5.5;
+const POSITION_DAMPING = 9;
 const LOOK_DAMPING = 8;
 const EASE_WINDOW = 0.08;
 
@@ -34,6 +35,7 @@ export class DescentController {
   private blendT = 0;
   private blendFrom = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
   private dampedHeight = 0;
+  private dampedPos = new THREE.Vector3();
   private lookTarget = new THREE.Vector3();
 
   constructor(
@@ -112,28 +114,51 @@ export class DescentController {
     if (this.phase === 'blend') {
       this.blendT = Math.min(this.blendT + dt / BLEND_SECONDS, 1);
       const s = THREE.MathUtils.smoothstep(this.blendT, 0, 1);
-      if (this.blendT === 0) this.dampedHeight = this.blendFrom.pos.y;
-      this.dampedHeight = damp(this.dampedHeight, heightTarget, HEIGHT_DAMPING, dt);
-      camera.position.set(
+      if (this.blendT === 0) {
+        this.dampedHeight = this.blendFrom.pos.y;
+        this.dampedPos.copy(camera.position);
+        this.lookTarget.copy(this.blendFrom.target);
+      }
+      this.dampedHeight = damp(
+        this.dampedHeight,
+        heightTarget,
+        HEIGHT_DAMPING,
+        dt,
+      );
+      this.dampedPos.set(
         THREE.MathUtils.lerp(this.blendFrom.pos.x, pos.x, s),
         THREE.MathUtils.lerp(this.blendFrom.pos.y, this.dampedHeight, s),
         THREE.MathUtils.lerp(this.blendFrom.pos.z, pos.z, s),
       );
+      camera.position.copy(this.dampedPos);
       this.lookTarget.copy(this.blendFrom.target).lerp(lookGoal, s);
       camera.lookAt(this.lookTarget);
       if (this.blendT >= 1) {
         this.phase = 'run';
         this.dampedHeight = camera.position.y;
+        this.dampedPos.copy(camera.position);
       }
       this.advance(dt);
       return;
     }
 
-    this.dampedHeight = damp(this.dampedHeight, heightTarget, HEIGHT_DAMPING, dt);
+    if (this.dampedPos.lengthSq() === 0) {
+      // resume without blend: pick up exactly where the camera is hovering
+      this.dampedPos.copy(camera.position);
+      this.dampedHeight = camera.position.y;
+    }
+
+    // single critically-smooth chase of the whole pose — flattens both
+    // elevation steps and lateral kinks from the DEM-sampled route line
+    this.dampedPos.lerp(
+      new THREE.Vector3(pos.x, heightTarget, pos.z),
+      1 - Math.exp(-POSITION_DAMPING * dt),
+    );
+    this.dampedHeight = this.dampedPos.y;
+    camera.position.copy(this.dampedPos);
+
     if (this.lookTarget.lengthSq() === 0) this.lookTarget.copy(lookGoal);
     this.lookTarget.lerp(lookGoal, 1 - Math.exp(-LOOK_DAMPING * dt));
-
-    camera.position.set(pos.x, this.dampedHeight, pos.z);
     camera.lookAt(this.lookTarget);
     this.advance(dt);
   }
