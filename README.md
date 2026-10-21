@@ -54,4 +54,4 @@ Validation at prep time: Streif assembled length within ~2% of the official 3,31
 
 ## Stack
 
-TypeScript + Vite + Three.js (no WebGL beyond version 2 support message), plain HTML controls; prepared static assets; no runtime API keys.
+TypeScript + Vite + Three.js (requires WebGL 2), plain HTML controls; prepared static assets; no runtime API keys. For a full status handoff (milestone status, known gaps, maintenance notes) see [HANDOVER.md](HANDOVER.md).

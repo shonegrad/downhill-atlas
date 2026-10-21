@@ -3,7 +3,8 @@
 ## Research brief and draft BRD
 
 **Date:** 20 October 2026  
-**Status:** Discovery draft; intended to guide an MVP prototype, not a navigation or safety product.
+**Status:** Discovery draft; intended to guide an MVP prototype, not a navigation or safety product.  
+**Update (21 Oct 2026):** Phase 0–3 MVP shipped with two locations (Streif/Kitzbühel as the first-resort narrative case; Kopaonik/Duboka 1 as the "second resort" architecture check — see Phase 5's expansion-readiness caveat and the Karaman greben data-quality finding). State and open threads: [HANDOVER.md](HANDOVER.md).
 
 ## 1. Product idea
 

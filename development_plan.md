@@ -4,6 +4,8 @@
 **Date:** 20 October 2026  
 **Purpose:** A development-ready starting plan for a local-first prototype of the Kitzbühel Streif in a stylized 3D mountain scene.
 
+> **Status (21 Oct 2026):** this plan has been fully implemented and exceeded — both locations, all four milestones complete, deployed to GitHub Pages. Current state, running instructions, gaps, and next-step candidates live in [HANDOVER.md](HANDOVER.md); feature/usage documentation in [README.md](README.md).
+
 ## Product outcome
 
 A desktop-first browser prototype that lets a user explore a stylized Hahnenkamm mountain, see the Streif downhill course clearly, and play a guided camera descent. Responsive layout and touch-friendly controls are included from the start. This first version is a visual experience, not a ski simulator or navigation product.
@@ -148,7 +150,7 @@ Do not couple route features to Three.js objects in source data. Convert to mesh
 
 ## First development task for an agent
 
-Inspect the repository. Then implement Milestone 0 and a thin Milestone 1 vertical slice: use a permissible small terrain sample and a clearly labeled placeholder route if final Streif assets are not ready; render an orbitable stylized terrain with a visible route ribbon and a simple guided camera movement. Keep the data format replaceable. Report the asset sources/terms checked, how to run locally, what remains approximate, and any implementation decisions that need review.
+*(Completed — this was the original kickoff brief. The equivalent "next task" brief for a future agent: pick up from HANDOVER.md's "Known gaps" list, starting with the curated-route override mechanism motivated by the Karaman greben finding.)*
 
 ## Reference facts and sources
 
