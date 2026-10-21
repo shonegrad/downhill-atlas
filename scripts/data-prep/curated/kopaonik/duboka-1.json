@@ -1,0 +1,37 @@
+{
+ "format": "downhill-atlas-curated-route/1",
+ "courseId": "duboka-1",
+ "name": "Duboka 1",
+ "nameSource": "Дубока 1",
+ "subtitle": "Kopaonik piste (curated way order)",
+ "difficulty": "intermediate",
+ "selection": {
+  "wayIdsInOrder": [
+   727138468,
+   44225653
+  ],
+  "segments": [
+   { "id": 727138468 },
+   { "id": 44225653, "cutStartAtNode": 561950895 }
+  ]
+ },
+ "provenance": {
+  "curatedAt": "2026-10-21",
+  "by": "Downhill Atlas data-prep analysis (scripts/data-prep)",
+  "method": "The mapped red branch (727138468) descends from the Suvo Rudište top (1957 m DEM) but stops at z≈1654, short of the Duboka 1 base junction. Its end node (561950895) is the exact mapped merge node of the black branch (44225653); OSM documents that both branches merge near the lift base ('Obe staze se spajaju u jednu pri samom dnu'). The chain therefore continues along the shared lower corridor: 44225653 is spliced at the merge node and kept to its end at z≈1610, which matches the official finish (1975 − 373 = 1602 m within DEM resolution).",
+  "joinGapsMeters": [0],
+  "excludedWayIds": [44225633, 915223221, 727138472, 1161685058, 1161685059, 44225718],
+  "exclusionNotes": [
+   "Way 44225633 is the vintage station-to-station mapping (base node 561951677 to top node 8568249171); only 16 coarse vertices, so it is redundant with the modern mapping and is excluded.",
+   "Way 915223221 duplicates the upper red corridor ~114 m east; including it would double-cover the same slope.",
+   "Way 727138472 covers a short upper stub; excluded for the same reason.",
+   "Connector ways 1161685058/1161685059/44225718 approach the base junction from other pistes (Krčmar, Kneževske bare) and are not part of Duboka 1 itself."
+  ],
+  "knownGaps": [
+   "Official length (1440 m) vs prepared length: the official number references the race alignment station-to-station; the mapped red branch measures longer, mostly from extra mapped switchbacks.",
+   "Official vertical drop (373 m) counts from the 1975 m top-station platform; the mapped geometry starts ~20 m lower on the DEM (1957 m).",
+   "Race-line fidelity is unchecked against official course setting."
+  ]
+ },
+ "chainStrategy": "curated ordered way list; red spine joined at the exact merge node to the black branch's shared lower corridor; oriented by DEM elevation"
+}

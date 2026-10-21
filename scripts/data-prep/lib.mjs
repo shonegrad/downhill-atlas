@@ -169,17 +169,34 @@ function variantScore(res) {
 // by the join distance; the whole chain is later oriented by elevation. Unlike
 // orientAndJoin this never reorders, so curated intent is preserved; gaps
 // beyond the tolerance are recorded and reported instead of silently merging.
+//
+// Selection entries are either a way id or { id, cutStartAtNode?, cutEndAtNode? }.
+// Node cuts trim the way at an exact OSM node index (way.nodes), which is how
+// one mapped branch splices into the shared lower corridor of another.
 export function stitchOrderedWays(loc, raw, orderedWayIds, { tolerance = JOINT_TOLERANCE_M } = {}) {
   const ways = new Map(raw.elements.filter((e) => e.type === 'way').map((w) => [w.id, w]));
   const missing = [];
   const segments = [];
-  for (const id of orderedWayIds) {
-    const way = ways.get(id);
+  for (const entry of orderedWayIds) {
+    const spec = typeof entry === 'object' ? entry : { id: entry };
+    const way = ways.get(spec.id);
     if (!way) {
-      missing.push(id);
+      missing.push(spec.id);
       continue;
     }
-    segments.push({ pts: way.geometry.map((p) => ({ lat: p.lat, lon: p.lon })), osmWayId: way.id });
+    let pts = way.geometry.map((p) => ({ lat: p.lat, lon: p.lon }));
+    const nodeIndex = (nodeId) => way.nodes.indexOf(nodeId);
+    if (spec.cutStartAtNode != null) {
+      const idx = nodeIndex(spec.cutStartAtNode);
+      if (idx < 0) throw new Error(`curated cut: node ${spec.cutStartAtNode} not on way ${way.id}`);
+      pts = pts.slice(idx);
+    }
+    if (spec.cutEndAtNode != null) {
+      const idx = nodeIndex(spec.cutEndAtNode);
+      if (idx < 0) throw new Error(`curated cut: node ${spec.cutEndAtNode} not on way ${way.id}`);
+      pts = pts.slice(0, idx + 1);
+    }
+    segments.push({ pts, osmWayId: way.id });
   }
   const latRef = aoiCenter(loc.aoi).lat;
 

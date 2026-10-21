@@ -212,6 +212,65 @@ Implemented in this phase:
 Constraints unchanged: static build, no runtime API keys, no live data, ODbL/manifest
 honesty; scene is a visualization, not navigation or safety guidance.
 
+## Plan v0.3 addendum — ski-feel descent + Kopaonik data round (21 Oct 2026)
+
+Implemented in this phase:
+
+### A. Ski-feel descent (done)
+1. **Low chase camera** — `CAM_OFFSET_M 16`, `LOOK_AHEAD_M 40`, descent FOV 66:
+   the camera pitches *into* the slope ahead instead of flying level over it.
+   Earlier probes (20–26 m offset with 60–85 m lookahead) read as a drone over
+   an orange carpet; the short lookahead was the decisive fix, not the height.
+2. **Vertical boost** — during the ride the vertical scale eases to at least
+   ×1.5 (independent of the user's relief toggle, which still wins when higher);
+   scale-aware height math keeps the ~16 m clearance true in world meters.
+3. **Race gates** — slalom pole+panel pairs every 90 m, alternating blue/red
+   (real convention), planted on the ribbon surface (not raw terrain — the old
+   ground-level poles sank under the groomed veil), 3.8 m poles, 2.2×1.5 m panels.
+4. **Descent scenery fade** — the featured band melts into the slope during the
+   ride: amber veil fades to translucent (reads as a sun-warmed groomed track),
+   the near-black course rim lightens, the centerline hairline dims; everything
+   eases back on exit. `setFeaturedDescentFade()` in routeLayer.
+5. **Band cross-shading** — per-column vertex colors (edges ×0.86) give the
+   groomed band a shaded cross-section instead of a flat fill; a saturated amber
+   centerline hairline keeps the course unambiguous at overview zoom (plain
+   1 px lines are invisible against white snow there).
+6. **Snow surface detail** — tileable 4-octave value-noise bump texture
+   (120 m tiles, deterministic), plus UVs on the terrain mesh.
+7. **QA hardening** — the smoke test's `networkidle0` stalled every page load
+   (vite HMR websocket); all waits now use a polling `waitFor()` helper and the
+   descent wait is 180 s on the slow headless environment.
+
+### B. Kopaonik data round (done)
+1. **Verified operator facts** — Skijališta Srbije fact sheet + kopaonik.rs trail
+   tables: centre 1,770 m; Pančićev vrh 2,017 m; 62 km slopes; ≈32,000 skiers/h;
+   21/9/6 easy/intermediate/hard; longest 3,500 m; max vertical 512 m; 97%
+   snowmaking; night skiing; 3 FIS-standard runs. Per-course: Duboka 1 (FIS)
+   1,440 m / 373 m (start 1,975 / finish 1,602 derived); Pančićev vrh 1,393 m /
+   248 m (finish 1,727 derived); Duboka 2 1,114 m / 394 m (no station elevations).
+2. **Featured course switched to the verified chain** — curated file
+   `curated/kopaonik/duboka-1.json`: red spine `727138468` (1957→1654 m) joined
+   at the exact shared node `561950895` to the black branch `44225653`
+   (1957→1610 m, cut at the node); the DEM base junction (~1610 m) matches the
+   official finish (1,602 m). DEM: 1,584 m / 344 m drop vs official 1,440 / 373.
+3. **Extra courses** — Pančićev vrh (1,380 m / 228 m DEM) and Duboka 2 (way
+   `44225635`, 1,068 m / 368 m DEM, FIS alignment); each with its own official
+   facts + provenance in the facts panel and manifest.
+4. **Resort facts** — 12-row operator fact sheet in the manifest dialog
+   (`resortFacts`), plus per-course official facts rows (start/finish elevations).
+5. **Landmarks from lift stations** — OSM has no named route nodes, so
+   `fetch-osm.mjs` gained a generic `landmarkSelectors` query; 44
+   aerialway=station nodes fetched (`raw/osm-kopaonik-landmarks.json`); courses
+   pull their landmarks from named lift stations via a 600 m proximity match.
+6. **AOI fix (critical)** — the Kopaonik AOI was ~8×7.7 km; all three courses
+   actually live in ~2.9×2.2 km. The oversized box pushed the overview camera
+   past ~11 km, where the 19 m band fell below depth precision and vanished
+   from overview/top-down (fine during descent at close range). Tight AOI:
+   `43.2695–43.2895 N, 20.8075–20.8445 E`; band now clearly visible everywhere.
+7. **Context hygiene** — a curated featured chain can splice differently-named
+   ways (the shared corridor is mapped as Црна дубока); `export-context.mjs`
+   now also excludes the featured curated file's way ids.
+
 ## Reference facts and sources
 
 - Official Streif downhill profile: 3,312 m course length and 860 m vertical drop ([Hahnenkamm official page](https://web1.hahnenkamm.com/en/racetracks/the-streif-downhill/)).

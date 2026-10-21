@@ -33,6 +33,17 @@ for (const id of locationIds) {
       ways.filter((w) => w.tags?.name === loc.featuredName).map((w) => w.id),
     );
   }
+  // A curated featured chain can splice ways from differently-named branches
+  // (e.g. the shared lower corridor mapped under the black-branch way); those
+  // way ids are excluded as well so the hero band stays unambiguous.
+  if (loc.featuredCurated) {
+    try {
+      const cur = readJson(`scripts/data-prep/${loc.featuredCurated}`);
+      for (const id of cur.selection.wayIdsInOrder ?? []) featuredWayIds.add(id);
+    } catch {
+      console.warn(`[export-context] featured curated file missing: ${loc.featuredCurated}`);
+    }
+  }
   // Curated extra courses keep their ways out of the context export too; the
   // assembled route files (build order: assemble-route runs before this) record
   // the ordered way lists.

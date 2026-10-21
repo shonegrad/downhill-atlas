@@ -79,9 +79,21 @@ export function buildTerrain(t: TerrainAsset): THREE.Mesh {
     }
   }
 
+  // UVs drive the procedural snow bump texture (deterministic value noise);
+  // features land at ~10-40 m so the low ride camera sees speed near the snow.
+  const uvs = new Float32Array(count * 2);
+  for (let j = 0; j < ny; j++) {
+    for (let i = 0; i < nx; i++) {
+      const k = j * nx + i;
+      uvs[k * 2] = i / (nx - 1);
+      uvs[k * 2 + 1] = 1 - j / (ny - 1);
+    }
+  }
+
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 4));
+  geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
   geo.setIndex(indices);
   geo.computeVertexNormals();
 
@@ -90,12 +102,84 @@ export function buildTerrain(t: TerrainAsset): THREE.Mesh {
     roughness: 0.96,
     metalness: 0,
     transparent: true,
+    bumpMap: makeSnowBumpTexture(t.eastMeters, t.northMeters),
+    bumpScale: 2.2,
   });
 
   const mesh = new THREE.Mesh(geo, material);
   mesh.castShadow = false;
   mesh.receiveShadow = false;
   return mesh;
+}
+
+// Deterministic tileable value-noise bump texture (4 octaves). Wrapping keeps
+// the repeat seamless; the repeat count maps one texture tile to ~120 m of
+// terrain so noise cells read at roughly 15 m / 7 m / 4 m / 2 m.
+const SNOW_TILE_METERS = 120;
+function makeSnowBumpTexture(eastMeters: number, northMeters: number): THREE.Texture {
+  const size = 128;
+  const heights4 = new Float32Array(size * size);
+  const octaves = [
+    { lattice: 4, amp: 0.42 },
+    { lattice: 8, amp: 0.28 },
+    { lattice: 16, amp: 0.2 },
+    { lattice: 32, amp: 0.1 },
+  ];
+  let seed = 0x9e3779b9;
+  const rng = () => {
+    seed ^= seed << 13;
+    seed ^= seed >>> 17;
+    seed ^= seed << 5;
+    return ((seed >>> 0) % 1024) / 1024;
+  };
+  for (const { lattice, amp } of octaves) {
+    const grid = new Float32Array(lattice * lattice);
+    let idx = 0;
+    for (let j = 0; j < lattice; j++) {
+      for (let i = 0; i < lattice; i++) {
+        grid[idx++] = rng();
+      }
+    }
+    const cell = size / lattice;
+    const wrap = (v: number, hi: number) => ((v % hi) + hi) % hi;
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const gx = x / cell;
+        const gy = y / cell;
+        const x0 = Math.floor(gx);
+        const y0 = Math.floor(gy);
+        const tx = gx - x0;
+        const ty = gy - y0;
+        const s = tx * tx * (3 - 2 * tx);
+        const u = ty * ty * (3 - 2 * ty);
+        const v00 = grid[wrap(y0, lattice) * lattice + wrap(x0, lattice)];
+        const v10 = grid[wrap(y0, lattice) * lattice + wrap(x0 + 1, lattice)];
+        const v01 = grid[wrap(y0 + 1, lattice) * lattice + wrap(x0, lattice)];
+        const v11 = grid[wrap(y0 + 1, lattice) * lattice + wrap(x0 + 1, lattice)];
+        const val =
+          (v00 * (1 - s) + v10 * s) * (1 - u) + (v01 * (1 - s) + v11 * s) * u;
+        heights4[y * size + x] += (val - 0.5) * amp;
+      }
+    }
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d')!;
+  const img = ctx.createImageData(size, size);
+  for (let i = 0; i < size * size; i++) {
+    const v = Math.max(0, Math.min(255, Math.round(128 + heights4[i] * 255)));
+    img.data[i * 4] = v;
+    img.data[i * 4 + 1] = v;
+    img.data[i * 4 + 2] = v;
+    img.data[i * 4 + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(Math.round(eastMeters / SNOW_TILE_METERS), Math.round(northMeters / SNOW_TILE_METERS));
+  return tex;
 }
 
 function paletteLerp(out: THREE.Color, f: number) {

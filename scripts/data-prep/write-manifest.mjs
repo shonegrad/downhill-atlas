@@ -40,19 +40,25 @@ function step(loc) {
   const routeSource = {
     id: 'route',
     name:
-      route.source.type === 'osm-relation'
-        ? 'OpenStreetMap — featured course piste relation'
-        : 'OpenStreetMap — featured course by exact way-name matching',
+      route.source.type === 'curated-way-list'
+        ? 'OpenStreetMap — featured course (curated way list, scripts/data-prep/curated/)'
+        : route.source.type === 'osm-relation'
+          ? 'OpenStreetMap — featured course piste relation'
+          : 'OpenStreetMap — featured course by exact way-name matching',
     access:
-      route.source.type === 'osm-relation'
-        ? `Overpass API extract; relation id ${route.source.relation}`
-        : `Overpass API extract; ways with name = ${route.source.wayNameMatch}`,
+      route.source.type === 'curated-way-list'
+        ? `Overpass API extract; ordered way ids ${route.source.wayIdsInOrder?.join(', ')}; curated ${route.source.curatedAt} (${route.source.wayNameMatch})`
+        : route.source.type === 'osm-relation'
+          ? `Overpass API extract; relation id ${route.source.relation}`
+          : `Overpass API extract; ways with name = ${route.source.wayNameMatch}`,
     license: 'ODbL 1.0 (© OpenStreetMap contributors)',
     attribution: 'Route: © OpenStreetMap contributors',
     processing:
-      'Ways joined at endpoints (member order for relations; tolerant linking otherwise), oriented by elevation, resampled at 10 m spacing.',
+      route.source.type === 'curated-way-list'
+        ? 'Ways pinned in a curated order (node-precise splices where branches merge), oriented by elevation, resampled at 10 m spacing.'
+        : 'Ways joined at endpoints (member order for relations; tolerant linking otherwise), oriented by elevation, resampled at 10 m spacing.',
     limitation:
-      'Public mapping approximates the true course line; treat geometry as candidate, not survey.',
+      'Public mapping approximates the true course alignment; race-line deviations are not surveyed.',
   };
 
   const sources = [
@@ -67,12 +73,23 @@ function step(loc) {
     },
     {
       id: 'official-facts',
-      name: loc.officialFacts
-        ? 'Official course documentation'
+      name: route.officialFacts
+        ? 'Official course and resort documentation (Skijališta Srbije, kopaonik.rs trail tables)'
         : 'Official course documentation — none verified for this location yet; only DEM-derived estimates are shown',
       license: 'Short factual quotation of headline numbers only.',
     },
   ];
+
+  if (route.landmarks?.length) {
+    sources.push({
+      id: 'landmarks',
+      name: 'OpenStreetMap — named landmark nodes along the courses (e.g. lift-station nodes)',
+      access: 'Overpass API extract; named nodes (natural=peak / place / tourism / aerialway) in the AOI, matched to course allowlists',
+      license: 'ODbL 1.0 (© OpenStreetMap contributors)',
+      attribution: 'Landmarks: © OpenStreetMap contributors',
+      limitation: 'Only mapped named nodes are shown; the extract contains no unnamed POIs.',
+    });
+  }
 
   // additional (curated) courses: provenance recorded per course in their
   // routes/<id>.json files; the manifest indexes them here.
@@ -103,7 +120,10 @@ function step(loc) {
       projection:
         'Local metric ENU approximation on sphere R=6371000: east = (lon-lon0)*R*cos(lat0)*pi/180, north = (lat-lat0)*R*pi/180. Scene maps north to -z. Vertical: scene y = (elevation - DEM min) * verticalScale.',
     },
-    officialCourseFacts: loc.officialFacts ?? null,
+    officialCourseFacts: route.officialFacts ?? null,
+    officialFactsNote:
+      'Official numbers reference the race alignment and station platforms; the prepared route follows public mapped geometry. Where both are shown, treat DEM values as estimates, not survey data.',
+    resortFacts: loc.resortFacts ?? null,
     featuredDifficultyNote: loc.featuredDifficultyNote ?? null,
     courses: readCourses(loc),
     demEstimates: {
@@ -123,11 +143,13 @@ function step(loc) {
     attributionLine:
       'Route, pistes, lifts and landmarks from © OpenStreetMap contributors (ODbL). Terrain: © offene Daten Österreichs – Digitales Geländemodell (DGM) Österreich (CC BY 3.0 AT, via Tilezen Terrain Tiles on AWS Open Data); SRTM data courtesy of the U.S. Geological Survey.',
     knownGaps: [
-      'Featured course follows the best public mapped geometry; race/precision deviations are not surveyed.',
-      'Vertical exaggeration currently 1.0; visual-spike alternatives still to be settled.',
+      'Featured course follows the best public mapped geometry; race-line deviations are not surveyed.',
+      'Official length/vertical reference station platforms and race alignment; prepared DEM values differ by single-digit percents (documented per course).',
+      'The featured Duboka 1 line follows the mapped red branch for the upper course, then the shared lower corridor mapped under the black-branch way; official course setting may deviate.',
       'DEM-class terrain implies smoothed micro-relief (falls, banks, gully edges).',
       'No trees/buildings/snow surface; stylized materials only.',
       'Piste difficulty colors follow OSM tags; local trail-color conventions differ.',
+      'OSM lift ways and the operator installation list differ slightly; treat lifts as mapped scenery, not inventory.',
     ],
   };
 

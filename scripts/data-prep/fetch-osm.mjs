@@ -24,6 +24,12 @@ for (const id of locationIds) {
     const landmarkIds = loc.landmarkNodeIds.join(',');
     const landmarkQuery = `[out:json][timeout:60];node(id:${landmarkIds});out body;`;
     await overpass(landmarkQuery, rawLandmarksFile(loc));
+  } else if (loc.landmarkSelectors?.length) {
+    // Generic named-node fetch for locations without hand-picked node ids:
+    // every selector is applied over the AOI bbox and all results are cached.
+    const selectors = loc.landmarkSelectors.map((sel) => `${sel}${bbox(loc.aoi)};`).join('');
+    const landmarkQuery = `[out:json][timeout:90];${selectors}out body;`;
+    await overpass(landmarkQuery, rawLandmarksFile(loc));
   }
 }
 console.log('done');

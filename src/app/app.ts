@@ -8,6 +8,7 @@ import {
   type LocationsAsset,
   type LocationEntry,
   type ManifestAsset,
+  type OfficialFacts,
   type RouteAsset,
 } from '../data/loader';
 import { createScene, type FeatureInfo, type SceneHandle } from '../scene/createScene';
@@ -178,8 +179,25 @@ export async function bootApp(canvas: HTMLCanvasElement): Promise<void> {
     btnRelief.setAttribute('aria-pressed', String(next !== 1));
   });
 
+  function officialRows(f: OfficialFacts | null | undefined, rows: (string | null)[][]) {
+    if (!f) {
+      rows.push(['Official facts', 'not verified for this location yet']);
+      return;
+    }
+    rows.push(
+      ['Official length', f.courseLengthMeters != null ? `${f.courseLengthMeters.toLocaleString()} m` : '—'],
+      ['Official vertical drop', f.verticalDropMeters != null ? `${f.verticalDropMeters.toLocaleString()} m` : '—'],
+      [
+        'Official start / finish',
+        f.startElevationMeters != null || f.finishElevationMeters != null
+          ? `${(f.startElevationMeters ?? '—').toLocaleString()} / ${(f.finishElevationMeters ?? '—').toLocaleString()} m`
+          : '—',
+      ],
+    );
+  }
+
   function fillPanels(manifest: ManifestAsset, route: RouteAsset) {
-    const f = manifest.officialCourseFacts;
+    const f = route.officialFacts ?? manifest.officialCourseFacts;
     const d = route.estimates
       ? {
           demRouteLengthMeters: Math.round((route.points.length - 1) * route.spacing),
@@ -190,16 +208,7 @@ export async function bootApp(canvas: HTMLCanvasElement): Promise<void> {
       : manifest.demEstimates;
     const rows: (string | null)[][] = [];
     if (f) {
-      rows.push(
-        ['Official length', `${f.courseLengthMeters.toLocaleString()} m`],
-        ['Official vertical drop', `${f.verticalDropMeters.toLocaleString()} m`],
-        [
-          'Official start / finish',
-          `${f.startElevationMeters.toLocaleString()} m / ${f.finishElevationMeters.toLocaleString()} m`,
-        ],
-      );
-    } else {
-      rows.push(['Official facts', 'not verified for this location yet']);
+      officialRows(f, rows);
     }
     if (d) {
       rows.push(
@@ -278,6 +287,26 @@ export async function bootApp(canvas: HTMLCanvasElement): Promise<void> {
     attrib.textContent = manifest.attributionLine;
     frag.append(attrib);
     addDifficultyNoteParagraph(frag, manifest.featuredDifficultyNote);
+
+    if (manifest.resortFacts) {
+      const h = document.createElement('h3');
+      h.textContent = manifest.resortFacts.headline;
+      frag.append(h);
+      const dl = document.createElement('dl');
+      dl.className = 'resort-facts';
+      for (const [label, value] of manifest.resortFacts.rows) {
+        const dt = document.createElement('dt');
+        dt.textContent = label;
+        const dd = document.createElement('dd');
+        dd.textContent = value;
+        dl.append(dt, dd);
+      }
+      frag.append(dl);
+      const note = document.createElement('p');
+      note.className = 'limitation';
+      note.textContent = manifest.resortFacts.attribution;
+      frag.append(note);
+    }
 
     const h = document.createElement('h3');
     h.textContent = 'Data sources';
@@ -434,6 +463,7 @@ export async function bootApp(canvas: HTMLCanvasElement): Promise<void> {
         else closeSelection();
       },
     });
+    (window as unknown as Record<string, unknown>).__downhillScene = scene;
     loading.hidden = true;
     visibleLayers = new Set(['featured', ...pisteClasses.filter((c) => c !== 'none')]);
     if (hasLifts) visibleLayers.add('lift');

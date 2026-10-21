@@ -19,6 +19,21 @@ const browser = await puppeteer.launch({
   defaultViewport: { width: 1280, height: 800 },
 });
 
+// Polling wait that does not depend on Chrome's rAF (headless software
+// rendering on a busy machine can throttle frames unpredictably).
+async function waitFor(page, fn, timeoutMs, label) {
+  const until = Date.now() + timeoutMs;
+  while (Date.now() < until) {
+    try {
+      if (await page.evaluate(fn)) return;
+    } catch {
+      // page may still be navigating; retry on the next tick
+    }
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  report(label);
+}
+
 for (const loc of ['streif', 'kopaonik']) {
   const page = await browser.newPage();
   const errors = [];
@@ -33,13 +48,12 @@ for (const loc of ['streif', 'kopaonik']) {
 
   const url = `${BASE}/?loc=${loc}`;
   console.log(`--- ${loc}: ${url}`);
-  await page.goto(url, { waitUntil: 'networkidle0', timeout: 60000 });
+  await page.goto(url, { waitUntil: 'load', timeout: 60000 });
   try {
-    await page.waitForFunction(() => {
+    await waitFor(page, () => {
       const loading = document.getElementById('loading');
-      return loading && hidden(loading) && document.querySelector('#app.ready');
-      function hidden(n) { return n.hidden === true; }
-    }, { timeout: 30000 });
+      return loading && loading.hidden === true && document.querySelector('#app.ready');
+    }, 30000, `[${loc}] scene never became ready`);
   } catch {
     report(`[${loc}] scene never became ready`);
   }
@@ -53,9 +67,10 @@ for (const loc of ['streif', 'kopaonik']) {
   if (facts < 40) report(`[${loc}] facts panel suspiciously short (${facts} chars)`);
   if (legend < 40) report(`[${loc}] legend panel suspiciously short (${legend} chars)`);
 
-  // landmarks button only on streif
+  // landmarks button: visible wherever the dataset carries landmark nodes
+  // (streif section nodes; kopaonik lift-station nodes)
   const hasLandmarksBtn = await page.$eval('#btn-landmarks', (n) => !n.hidden);
-  if ((loc === 'streif') !== hasLandmarksBtn) report(`[${loc}] landmarks button visibility wrong (visible=${hasLandmarksBtn})`);
+  if ((loc === 'streif' || loc === 'kopaonik') !== hasLandmarksBtn) report(`[${loc}] landmarks button visibility wrong (visible=${hasLandmarksBtn})`);
 
   // click across a grid of sample points -> selection panel on a feature hit
   let selVisible = false;
@@ -93,8 +108,8 @@ for (const loc of ['streif', 'kopaonik']) {
   if (coursesVisible) {
     const factsBefore = await page.$eval('#facts', (n) => n.textContent);
     await page.select('#course-select', await page.$eval('#course-select', (n) => n.options[n.options.length - 1].value));
-    await page.waitForFunction(() => new URLSearchParams(location.search).get('course'), { timeout: 15000 });
-    await new Promise((r) => setTimeout(r, 400));
+    await waitFor(page, () => new URLSearchParams(location.search).get('course'), 15000, `[${loc}] course param never set`);
+    await new Promise((r) => setTimeout(r, 1200));
     const factsAfter = await page.$eval('#facts', (n) => n.textContent);
     if (factsBefore === factsAfter) report(`[${loc}] facts panel unchanged after course switch`);
     const legendAfter = await page.$eval('#legend', (n) => n.textContent);
@@ -104,8 +119,8 @@ for (const loc of ['streif', 'kopaonik']) {
     await page.screenshot({ path: `${OUT}/${loc}-2b-second-course.png` });
     // switch back to the default course
     await page.select('#course-select', await page.$eval('#course-select', (n) => n.options[0].value));
-    await page.waitForFunction(() => !new URLSearchParams(location.search).get('course'), { timeout: 15000 });
-    await new Promise((r) => setTimeout(r, 400));
+    await waitFor(page, () => !new URLSearchParams(location.search).get('course'), 15000, `[${loc}] course param never cleared`);
+    await new Promise((r) => setTimeout(r, 1200));
     const url = await page.url();
     if (url.includes('course=')) report(`[${loc}] ?course param not cleared when returning to default course`);
   }
@@ -127,14 +142,8 @@ for (const loc of ['streif', 'kopaonik']) {
   await page.screenshot({ path: `${OUT}/${loc}-5-descent.png` });
   await page.click('#btn-pause'); // pause
   await page.click('#btn-pause'); // resume
-  try {
-    await page.waitForFunction(
-      () => document.getElementById('btn-play') && document.getElementById('btn-play').hidden === false,
-      { timeout: 120000 },
-    );
-  } catch {
-    report(`[${loc}] descent never returned to overview`);
-  }
+  await waitFor(page, () => document.getElementById('btn-play') && document.getElementById('btn-play').hidden === false,
+    180000, `[${loc}] descent never returned to overview`);
   await page.screenshot({ path: `${OUT}/${loc}-6-after-descent.png` });
 
   if (errors.length) {
@@ -147,7 +156,7 @@ for (const loc of ['streif', 'kopaonik']) {
 
 // fresh user path: default URL, no ?loc
 const page = await browser.newPage();
-await page.goto(BASE + '/', { waitUntil: 'networkidle0', timeout: 60000 });
+await page.goto(BASE + '/', { waitUntil: 'load', timeout: 60000 });
 const selectValue = await page.$eval('#location-select', (n) => n.value);
 console.log(`default location selected: ${selectValue}`);
 if (!selectValue) report('location select empty on default URL');
@@ -159,7 +168,7 @@ const deepErrors = [];
 deep.on('console', (m) => {
   if (m.type() === 'error') deepErrors.push(m.text());
 });
-await deep.goto(`${BASE}/?loc=kopaonik&course=pancic-vrh`, { waitUntil: 'networkidle0', timeout: 60000 });
+await deep.goto(`${BASE}/?loc=kopaonik&course=pancic-vrh`, { waitUntil: 'load', timeout: 60000 });
 await new Promise((r) => setTimeout(r, 1500));
 const deepCourse = await deep.$eval('#course-select', (n) => n.value);
 console.log(`deep link course selected: ${deepCourse}`);

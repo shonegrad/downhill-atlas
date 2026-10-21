@@ -10,6 +10,8 @@ import {
   rawLandmarksFile,
   outDirOf,
   assembleFeatured,
+  aoiCenter,
+  metersPerDegree,
   stitchOrderedWays,
   toLocalMeters,
   localOrigin,
@@ -114,7 +116,6 @@ function buildRoute(loc, terrain, assembly, meta) {
       source: lm.source,
     };
   });
-
   const demStart = sampleTerrainGrid(terrain, resampled[0][0], resampled[0][1]);
   const demFinish = sampleTerrainGrid(
     terrain,
@@ -136,6 +137,7 @@ function buildRoute(loc, terrain, assembly, meta) {
     spacing: Number(spacingM.toFixed(2)),
     points: resampled,
     landmarks,
+    officialFacts: meta.officialFacts ?? null,
     estimates: {
       demStartElevation: Math.round(demStart),
       demFinishElevation: Math.round(demFinish),
@@ -165,50 +167,101 @@ for (const id of locationIds) {
   if (!loc) throw new Error(`unknown location ${id}`);
 
   const raw = readJson(`scripts/data-prep/raw/${rawFeaturesFile(loc)}`);
-  const landmarksRaw = loc.landmarkNodeIds?.length
+  const hasLandmarksRaw =
+    loc.landmarkNodeIds?.length || loc.landmarkSelectors?.length || loc.featuredLandmarkNodeNames;
+  const landmarksRaw = hasLandmarksRaw
     ? readJson(`scripts/data-prep/raw/${rawLandmarksFile(loc)}`)
     : null;
   const terrain = readJson(`${outDirOf(loc)}/terrain.json`);
   const iso = new Date().toISOString().slice(0, 10);
   const courses = [];
 
+  // --- named landmark nodes (OSM nodes with names, e.g. lift stations) ---------
+  // When a location fetches a generic named-node extract, courses pick the
+  // nodes whose names match their allowlist and whose position falls near the
+  // assembled chain; exact snapping happens later in buildRoute.
+  function nodeLandmarksFor(allowNames, chainLatLon) {
+    if (!landmarksRaw || !allowNames?.length) return [];
+    const allow = new Set(allowNames);
+    const nodes = landmarksRaw.elements.filter(
+      (e) => e.type === 'node' && e.tags?.name && allow.has(e.tags.name),
+    );
+    const out = [];
+    const m = metersPerDegree(aoiCenter(loc.aoi).lat);
+    for (const n of nodes) {
+      let bestD = Infinity;
+      for (const p of chainLatLon) {
+        bestD = Math.min(
+          bestD,
+          Math.hypot((p.lon - n.lon) * m.east, (p.lat - n.lat) * m.north),
+        );
+      }
+      if (bestD > 600) continue;
+      const kind = n.tags.natural === 'peak' ? 'peak' : n.tags.aerialway ? 'lift station' : 'named node';
+      out.push({
+        id: `osm-node-${n.id}`,
+        name: n.tags.name,
+        lat: n.lat,
+        lon: n.lon,
+        source: `OSM ${kind} node (© OpenStreetMap contributors)`,
+      });
+    }
+    return out;
+  }
+
   // --- default featured course (format unchanged, now also in routes index) ---
-  const featured = assembleFeatured(loc, raw, landmarksRaw);
+  let curatedFeatured = null;
+  if (loc.featuredMode === 'curatedFile') {
+    curatedFeatured = readJson(`scripts/data-prep/${loc.featuredCurated}`);
+  }
+  const featured = curatedFeatured
+    ? stitchOrderedWays(loc, raw, curatedFeatured.selection.segments ?? curatedFeatured.selection.wayIdsInOrder)
+    : assembleFeatured(loc, raw, landmarksRaw);
+  featured.nodeLandmarks = nodeLandmarksFor(loc.featuredLandmarkNodeNames, featured.chain);
   const featuredRoute = buildRoute(loc, terrain, featured, {
-    courseId: loc.featuredId ?? 'featured',
-    subtitle: loc.featuredSubtitle,
+    courseId: curatedFeatured?.courseId ?? loc.featuredId ?? 'featured',
+    subtitle: curatedFeatured?.subtitle ?? loc.featuredSubtitle,
     name: loc.featuredNameLatin ?? loc.featuredName,
-    nameSource: loc.featuredName,
+    nameSource: curatedFeatured?.nameSource ?? loc.featuredName,
     nameSourceLatin: loc.featuredNameLatin,
     difficulty: loc.featuredDifficulty,
+    officialFacts: loc.officialFacts,
     source: {
-      type: loc.featuredMode === 'relation' ? 'osm-relation' : 'osm-named-ways',
+      type: curatedFeatured ? 'curated-way-list' : loc.featuredMode === 'relation' ? 'osm-relation' : 'osm-named-ways',
       relation: loc.routeRelationId ?? undefined,
       wayNameMatch: loc.featuredMode === 'relation' ? undefined : loc.featuredName,
+      wayIdsInOrder: curatedFeatured?.selection.wayIdsInOrder,
+      curatedAt: curatedFeatured?.provenance.curatedAt,
+      curatedChainStrategy: curatedFeatured?.chainStrategy,
       attribution: '© OpenStreetMap contributors (ODbL)',
       extractedAt: iso,
     },
-    chainStrategy:
-      loc.featuredMode === 'relation'
+    chainStrategy: curatedFeatured
+      ? curatedFeatured.chainStrategy
+      : loc.featuredMode === 'relation'
         ? 'ordered member ways of the OSM piste relation (start -> finish), validated by endpoint chaining'
         : 'ways matched by exact name, joined by tolerant endpoint linking, oriented by elevation',
   });
+  if (curatedFeatured && featured.gaps.length) {
+    console.warn(`[curated] ${loc.id}/${featuredRoute.courseId}: join gaps ${featured.gaps.join(', ')} m`);
+  }
   writeJson(`${outDirOf(loc)}/route.json`, featuredRoute);
   courses.push({
     id: featuredRoute.courseId,
     name: featuredRoute.name,
     file: 'route.json',
     isDefault: true,
-    curated: false,
+    curated: loc.featuredMode === 'curatedFile',
   });
 
   // --- curated extra courses ----------------------------------------------------
   for (const course of loc.extraCourses ?? []) {
     const cur = readJson(`scripts/data-prep/${course.curated}`);
-    const assembly = stitchOrderedWays(loc, raw, cur.selection.wayIdsInOrder);
+    const assembly = stitchOrderedWays(loc, raw, cur.selection.segments ?? cur.selection.wayIdsInOrder);
     if (assembly.missing.length) {
       throw new Error(`curated ${course.curated}: ways missing from extract: ${assembly.missing.join(', ')}`);
     }
+    assembly.nodeLandmarks = nodeLandmarksFor(course.landmarkNodeNames, assembly.chain);
     const courseRoute = buildRoute(loc, terrain, assembly, {
       courseId: cur.courseId,
       subtitle: cur.subtitle,
@@ -216,6 +269,7 @@ for (const id of locationIds) {
       nameSource: cur.nameSource,
       nameSourceLatin: course.name,
       difficulty: cur.difficulty,
+      officialFacts: course.officialFacts ?? null,
       source: {
         type: 'curated-way-list',
         wayIdsInOrder: cur.selection.wayIdsInOrder,

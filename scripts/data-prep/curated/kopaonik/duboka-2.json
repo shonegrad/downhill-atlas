@@ -1,0 +1,27 @@
+{
+ "format": "downhill-atlas-curated-route/1",
+ "courseId": "duboka-2",
+ "name": "Duboka 2",
+ "nameSource": "Дубока 2",
+ "subtitle": "Kopaonik piste (curated way order)",
+ "difficulty": "intermediate",
+ "selection": {
+  "wayIdsInOrder": [44225635]
+ },
+ "provenance": {
+  "curatedAt": "2026-10-21",
+  "by": "Downhill Atlas data-prep analysis (scripts/data-prep)",
+  "method": "Way 44225635 is the mapping whose geometry matches the official Duboka 2 facts: length 1067 m vs official 1114 m and DEM drop 370 m vs official 394 m; both ends touch named lift-station nodes ('Дубока 2' base 561951768, '20 Дубока 2' top 8625716610).",
+  "joinGapsMeters": [],
+  "excludedWayIds": [892708318, 892708319],
+  "exclusionNotes": [
+   "Way 892708318 (3905 m) is a mapped area route whose DEM profile drops to 1519 m and climbs back to 1895 m — a ski-way loop, not a single descent line.",
+   "Way 892708319 (1245 m, 1894→1610) does not match the official vertical drop (394 m) and its lower end coincides with the Duboka 1 junction rather than the Duboka 2 bottom mapping."
+  ],
+  "knownGaps": [
+   "Only 14 vertices in source; the 10 m resampling smooths the actual switchbacks.",
+   "Race-line fidelity is unchecked against official course setting."
+  ]
+ },
+ "chainStrategy": "curated ordered way list; single mapped way, oriented by DEM elevation"
+}

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { Dataset, RouteAsset } from '../data/loader';
 import { buildTerrain, repaintByNormals } from './terrainMesh';
-import { applyHighlight, buildContextFeatures, buildFeaturedCourse, type FeatureRecord } from './routeLayer';
+import { applyHighlight, buildContextFeatures, buildFeaturedCourse, setFeaturedDescentFade, type FeatureRecord } from './routeLayer';
 import { buildLandmarks, type LandmarkLayer } from './labels';
 import { DescentController } from './descent';
 import { SKY_COLOR, sampleTerrain } from './coordinates';
@@ -26,6 +26,12 @@ export interface SceneCallbacks {
 }
 
 export interface SceneHandle {
+  // debug hook (QA harness introspection); harmless to keep public
+  __sceneDebug: {
+    scene: THREE.Scene;
+    camera: THREE.PerspectiveCamera;
+    course: () => { group: THREE.Group };
+  };
   startDescent: (fromBeginning: boolean) => void;
   pauseDescent: () => void;
   resumeDescent: () => void;
@@ -95,6 +101,13 @@ export function createScene(canvas: HTMLCanvasElement, data: Dataset, callbacks:
   scene.add(terrainGroup);
 
   const scale = { value: terrain.verticalScale };
+  // The user's relief toggle; during a descent the scale eases up to at least
+  // DESCENT_SCALE_BOOST so the run reads steeper, then settles back.
+  let reliefUser = terrain.verticalScale;
+  const DESCENT_SCALE_BOOST = 1.5;
+  const DESCENT_SCALE_RAMP = 2.2;
+  const BASE_FOV = 55;
+  const DESCENT_FOV = 66;
   function applyScale() {
     terrainGroup.scale.y = scale.value;
   }
@@ -265,12 +278,28 @@ export function createScene(canvas: HTMLCanvasElement, data: Dataset, callbacks:
   // --- render loop -------------------------------------------------------------------
   let raf = 0;
   let last = performance.now();
+  let sceneryFade = 0;
+  let sceneryApplied = -1;
 
   function loop(now: number) {
     raf = requestAnimationFrame(loop);
     const dt = Math.min((now - last) / 1000, 0.1);
     last = now;
     const descending = descent.isPlaying();
+
+    // vertical scale + fov glide between overview and the ski-cam profile
+    const scaleTarget = descending ? Math.max(reliefUser, DESCENT_SCALE_BOOST) : reliefUser;
+    if (Math.abs(scaleTarget - scale.value) > 1e-4) {
+      scale.value +=
+        (scaleTarget - scale.value) * Math.min(1, 1 - Math.exp(-DESCENT_SCALE_RAMP * dt));
+      applyScale();
+    }
+    const fovTarget = descending ? DESCENT_FOV : BASE_FOV;
+    if (Math.abs(fovTarget - camera.fov) > 1e-3) {
+      camera.fov += (fovTarget - camera.fov) * Math.min(1, 1 - Math.exp(-DESCENT_SCALE_RAMP * dt));
+      camera.updateProjectionMatrix();
+    }
+
     if (descending) {
       controls.enabled = false;
       descent.update(dt, camera, scale.value);
@@ -281,6 +310,12 @@ export function createScene(canvas: HTMLCanvasElement, data: Dataset, callbacks:
     if (landmarks) {
       landmarks.setVisible(landmarksOn && !descending);
       landmarks.update(camera);
+    }
+    // scenery fade eases with the same ramp as the scale/fov glide
+    sceneryFade += ((descending ? 1 : 0) - sceneryFade) * Math.min(1, 1 - Math.exp(-2.5 * dt));
+    if (Math.abs(sceneryFade - sceneryApplied) > 0.015 || (sceneryFade < 0.001) !== (sceneryApplied < 0.001)) {
+      sceneryApplied = sceneryFade;
+      setFeaturedDescentFade(course.group, sceneryFade);
     }
     renderer.render(scene, camera);
   }
@@ -299,6 +334,12 @@ export function createScene(canvas: HTMLCanvasElement, data: Dataset, callbacks:
   window.addEventListener('resize', resize);
 
   return {
+    // debug hook (QA harness introspection); harmless to keep public
+    __sceneDebug: {
+      scene,
+      camera,
+      course: () => course,
+    },
     startDescent: (fromBeginning: boolean) => {
       descent.captureBlend(camera);
       descent.start(fromBeginning);
@@ -314,10 +355,9 @@ export function createScene(canvas: HTMLCanvasElement, data: Dataset, callbacks:
       presetOverview();
     },
     descentActive: () => descent.isPlaying(),
-    verticalScale: () => scale.value,
+    verticalScale: () => reliefUser,
     setVerticalScale: (next: number) => {
-      scale.value = next;
-      applyScale();
+      reliefUser = next;
     },
     resetView: presetOverview,
     presetTopDown,

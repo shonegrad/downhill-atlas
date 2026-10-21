@@ -12,6 +12,14 @@ export interface TerrainAsset {
   heights: number[];
 }
 
+export interface OfficialFacts {
+  courseLengthMeters: number | null;
+  verticalDropMeters: number | null;
+  startElevationMeters: number | null;
+  finishElevationMeters: number | null;
+  attribution: string;
+}
+
 export interface RouteAsset {
   format: string;
   courseId?: string;
@@ -20,6 +28,7 @@ export interface RouteAsset {
   nameSource?: string;
   nameSourceLatin?: string;
   difficulty?: string | null;
+  officialFacts?: OfficialFacts | null;
   source?: {
     type: string;
     relation?: number;
@@ -72,13 +81,12 @@ export interface FeatureAsset {
 export interface ManifestAsset {
   format: string;
   generatedAt: string;
-  officialCourseFacts: {
-    courseLengthMeters: number;
-    verticalDropMeters: number;
-    startElevationMeters: number;
-    finishElevationMeters: number;
+  officialCourseFacts: OfficialFacts | null;
+  resortFacts?: {
+    headline: string;
+    rows: [string, string][];
     attribution: string;
-  };
+  } | null;
   demEstimates: {
     demRouteLengthMeters: number;
     demVerticalDropMeters: number;

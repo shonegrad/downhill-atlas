@@ -108,9 +108,11 @@ switching at Kopaonik and the `?loc=kopaonik&course=pancic-vrh` deep link.
    synced elevation profile, race-story mode.
 2. **Karaman greben curated curation** — the layer exists; needs a way-selection pass
    (its OSM mapping is a contour circuit; no monotone chain remains to reuse).
-3. **Kopaonik official facts:** none verified; facts panel says so explicitly. A resolution
-   (official resort doc or measured reference) would upgrade Duboka 1's card honesty —
-   Pančićev vrh has the same gap (race-line fidelity unchecked).
+3. **Kopaonik official facts — RESOLVED (21 Oct 2026):** operator facts verified
+   (Skijališta Srbije + kopaonik.rs trail tables) and wired into the facts panel
+   (per-course `officialFacts` + resort `resortFacts`); the panel labels DEM
+   numbers as estimates next to the official values. Remaining honesty gap:
+   race-line fidelity (curated chains follow the mapped pistes, not the race line).
 4. **Pančićev vrh alternates excluded, not merged:** the fork at ~1840 m offers two lines;
    the curated file documents the single-branch choice. A compare-the-branches feature
    could revisit this.
@@ -124,14 +126,25 @@ switching at Kopaonik and the `?loc=kopaonik&course=pancic-vrh` deep link.
   `FEATURED_COLOR` amber is reserved for the featured course — do not reuse
   difficulty hues), `src/style.css` (`--featured` swatch; keep in sync), and
   the favicon in `index.html`.
-- Descent feel constants: `descent.ts` (`CAM_OFFSET_M` 50, `LOOK_AHEAD_M` 120,
-  `POSITION_DAMPING`, `LOOK_DAMPING`, `BLEND_SECONDS`, `EASE_WINDOW`); featured
-  band width caps live in `routeLayer.ts` (`halfWidth` = min 12 m); base timing
-  per course is `route.descentDurationSeconds`, stamped by `assemble-route.mjs`
-  from route length; reduced-motion doubles it at runtime.
+- Descent feel constants: `descent.ts` (`CAM_OFFSET_M` 16, `LOOK_AHEAD_M` 40 —
+  a low, pitch-down ski cam; raising the lookahead reintroduces the "drone over
+  an orange carpet" look, height alone does not), `POSITION_DAMPING`,
+  `LOOK_DAMPING`, `BLEND_SECONDS`, `EASE_WINDOW`; descent scenery fade lives in
+  `routeLayer.ts` (`setFeaturedDescentFade`, `DESCENT_*_TINT`), the scale boost
+  + FOV glide in `createScene.ts` (`DESCENT_SCALE_BOOST`, `DESCENT_FOV`); gate
+  spacing/size in `routeLayer.ts` (`GATE_SPACING_M` 90, `GATE_POLE_M` 3.8,
+  gates are planted on the ribbon surface — keep that if you touch the band
+  lift); featured band width caps live in `routeLayer.ts` (`halfWidth` = min
+  9.5 m) with the amber centerline hairline right below; base timing per course
+  is `route.descentDurationSeconds`, stamped by `assemble-route.mjs` from route
+  length; reduced-motion doubles it at runtime.
 - Curated courses live in two places: the input (`scripts/data-prep/curated/...`, reviewed
   provenance) and the generated `public/data/<id>/routes/<course>.json`. Edit the input,
   re-run `npm run prep:data -- <id>`; never hand-edit the generated files.
+- Location AOI sizing rule: cover the courses plus a few hundred metres of
+  margin, not the whole resort. An oversized AOI pushes the overview/top-down
+  cameras so far out that the ~19 m featured band falls below depth precision
+  and disappears (this cost Kopaonik a full data re-bake in v0.3).
 - The data pipeline caches Overpass JSON and terrain tiles under `scripts/data-prep/raw/`
   (git-ignored, ~170 MB); delete it to force re-fetch.
 - Deployment is zero-touch: push to `main` → Pages. First-time setup steps used: `gh repo

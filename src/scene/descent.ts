@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 import type { RouteAsset, TerrainAsset } from '../data/loader';
 import { sampleTerrain } from './coordinates';
+const CAM_OFFSET_M = 16;
 
-const CAM_OFFSET_M = 50;
-const LOOK_AHEAD_M = 120;
+const LOOK_AHEAD_M = 40;
 const BLEND_SECONDS = 1;
 const HEIGHT_DAMPING = 5.5;
 const POSITION_DAMPING = 9;
@@ -108,7 +108,10 @@ export class DescentController {
     const pos = this.curve.getPointAt(f);
     const aheadPos = this.curve.getPointAt(Math.min(f + LOOK_AHEAD_M / this.totalLength, 1));
     const terrainHeight = this.heightAt(pos);
-    const heightTarget = Math.max(pos.y * scale, terrainHeight) + CAM_OFFSET_M * scale;
+    // Both heights are geometry-space meters; `scale` is the live vertical
+    // exaggeration (run boosts it to 1.5), while the offset stays in world
+    // meters so the camera keeps a true ~18 m clearance over the snow.
+    const heightTarget = Math.max(pos.y, terrainHeight) * scale + CAM_OFFSET_M;
     const lookGoal = aheadPos.clone().setY(aheadPos.y * scale);
 
     if (this.phase === 'blend') {
