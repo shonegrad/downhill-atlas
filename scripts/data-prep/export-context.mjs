@@ -1,5 +1,5 @@
 // Export subdued context features (other pistes, lifts) inside a location's AOI.
-// Featured-course ways are excluded so the hero route stays unambiguous.
+// Featured- and curated-course ways are excluded so every hero route stays unambiguous.
 
 import {
   rawFeaturesFile,
@@ -33,6 +33,20 @@ for (const id of locationIds) {
       ways.filter((w) => w.tags?.name === loc.featuredName).map((w) => w.id),
     );
   }
+  // Curated extra courses keep their ways out of the context export too; the
+  // assembled route files (build order: assemble-route runs before this) record
+  // the ordered way lists.
+  let curatedWayIds = new Set();
+  for (const course of loc.extraCourses ?? []) {
+    const routesFile = `${outDirOf(loc)}/routes/${course.id}.json`;
+    try {
+      const built = readJson(routesFile);
+      for (const wayId of built.source.wayIdsInOrder ?? []) curatedWayIds.add(wayId);
+    } catch {
+      console.warn(`[export-context] curated route missing: ${routesFile}`);
+    }
+  }
+  const excludedWayIds = new Set([...featuredWayIds, ...curatedWayIds]);
 
   function localLine(geometry) {
     return geometry.map((p) => {
@@ -50,7 +64,7 @@ for (const id of locationIds) {
     const intersects = el.geometry.some((p) => inAoi(loc.aoi, p.lat, p.lon));
     if (!intersects) continue;
 
-    if (tags['piste:type'] === 'downhill' && !featuredWayIds.has(el.id)) {
+    if (tags['piste:type'] === 'downhill' && !excludedWayIds.has(el.id)) {
       pistes.push({
         id: `way-${el.id}`,
         name: tags.name ?? null,
@@ -71,7 +85,7 @@ for (const id of locationIds) {
   writeJson(`${outDirOf(loc)}/pistes.json`, {
     format: 'downhill-atlas-features/1',
     kind: 'pistes',
-    filter: 'piste:type=downhill ways intersecting the AOI; featured course ways excluded',
+    filter: 'piste:type=downhill ways intersecting the AOI; featured and curated course ways excluded',
     attribution: '© OpenStreetMap contributors (ODbL)',
     features: pistes,
   });

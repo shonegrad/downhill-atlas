@@ -1,7 +1,8 @@
 # Downhill Atlas — Project Handover
 
 **Date:** 21 October 2026
-**State:** All four plan milestones implemented, QA-verified, and deployed.
+**State:** M0–M3 complete + plan-v0.2 round (curated course layer, switchable second
+courses, descent smoothing, ribbon/label polish). QA-verified and deployed.
 **Live:** https://shonegrad.github.io/downhill-atlas/
 **Repo:** `github.com/shonegrad/downhill-atlas` (branch `main`, deploys automatic on push)
 
@@ -9,16 +10,18 @@
 
 A static, browser-based 3D explorer for named ski courses. Mountains render as a stylized
 grayscale relief; all scene color is data-driven (featured course ribbon, difficulty-colored
-pistes, lifts). Two locations ship today:
+pistes, lifts). Locations and courses (switchable in the UI, deep-linkable via `?loc=` /
+`?course=`):
 
-| Location | Featured course | Source of route line | Landmarks |
+| Location | Courses | Route source | Landmarks |
 | --- | --- | --- | --- |
-| Kitzbühel, Austria | Streif (relation `12870777`, ordered member ways) | OSM relation, validated ±2% vs official 3,312 m | 14 course sections |
-| Kopaonik, Serbia | Duboka 1 (`Дубока 1`, ways matched by exact name, joined and DEM-oriented) | OSM ways, monotone descent 1954→1655 m | none |
+| Kitzbühel, Austria | Streif (default) | OSM relation `12870777`, ordered member ways, validated ±2% vs official 3,312 m | 14 course sections |
+| Kopaonik, Serbia | Duboka 1 (default); **Pančićev vrh** (curated) | Duboka 1: OSM ways, monotone 1954→1655 m. Pančićev vrh: curated ordered way list 808543059 → 958974764 → 44225656 → 958974765 (1,380 m, 1960→1732 m) | none |
 
 Adding another resort is a data task: add an entry to `LOCATIONS` in
 `scripts/data-prep/config.mjs`, run `npm run prep:data -- <id>`, and regenerate the
 locations index. The UI selector reads `public/data/locations.json`; no code changes needed.
+Additional courses per location use the curated convention below.
 
 ## How to run
 
@@ -34,17 +37,19 @@ npm run prep:data  # re-run the full data pipeline (per-location, cached pulls)
 ## Architecture (what is where)
 
 ```text
-src/data/loader.ts        # typed loaders for terrain/route/pistes/lifts/manifest/locations
+src/data/loader.ts        # typed loaders for terrain/route/pistes/lifts/manifest/locations (+ per-course routes)
 src/scene/coordinates.ts  # local ENU frame: east=x, north=-z, h - elevationMin scaled by verticalScale
 src/scene/terrainMesh.ts  # grayscale vertex-color terrain + slope/snow repaint
 src/scene/routeLayer.ts   # featured ribbon, per-feature line records, highlight state
-src/scene/labels.ts       # projected landmark labels (no CSS2DRenderer)
-src/scene/descent.ts      # CatmullRom camera descent, smoothstep ease, reduced-motion aware
-src/scene/createScene.ts  # scene assembly, picking, camera presets, layer visibility
-src/app/app.ts            # UI wiring: panels, legend toggles, selection card, location switch
+src/scene/labels.ts       # projected landmark labels (screen-space decluttering, no CSS2DRenderer)
+src/scene/descent.ts      # damped camera descent: blended ease-in, smoothed path, distance-normalized speed
+src/scene/createScene.ts  # scene assembly, picking, camera presets, layer visibility, swapRoute
+src/app/app.ts            # UI wiring: panels, legend toggles, selection card, location AND course switch
 scripts/data-prep/        # location-parametrized pipeline (config.mjs is the switchboard)
+scripts/data-prep/curated/<loc>/<course>.json   # curated route inputs (ordered way list + provenance)
 scripts/qa-smoke.mjs      # puppeteer-core + system Chrome; screenshots to /tmp/opencode/qa-shots
 public/data/<id>/         # generated assets; commit these (they are the product's data)
+public/data/<id>/routes/  # per-course route files + index.json (locations with extra courses)
 github-workflow           # .github/workflows/deploy.yml builds and publishes dist/ on push to main
 ```
 
@@ -52,10 +57,29 @@ Design invariants worth preserving:
 
 - Terrain render is grayscale; color belongs to data layers only.
 - Official facts and DEM-derived estimates are always labeled separately; estimates never
-  appear unlabeled.
+  appear unlabeled. Route provenance is always labeled
+  (relation / named ways / curated order).
 - Data formats are replaceable and renderer-agnostic (`terrain.json`, `route.json`,
-  `pistes.json`, `lifts.json`, `manifest.json` per location; the manifest carries licenses).
+  `pistes.json`, `lifts.json`, `manifest.json` per location; per-course files under
+  `routes/`; the manifest carries licenses).
 - No runtime API keys; everything is static and subpath-hostable (`vite base: './'`).
+
+## Curated course layer (plan v0.2)
+
+Why it exists: OSM sometimes maps famous pistes as **closed zero-net contour circuits**
+(DEM-verified for Karaman greben and now also for the four modern Панчићев врх ways), which
+can never represent a descent. The curated layer lets the project pin a defensible route
+without silently re-drawing OSM:
+
+- **Input**: `scripts/data-prep/curated/<loc>/<course>.json` — ordered way ids from the
+  same Overpass extract, measured join gaps, excluded ways with reasons, provenance.
+- **Output**: `public/data/<loc>/routes/<course>.json` (same route format + `source.type:
+  "curated-way-list"` + own estimates) and `routes/index.json`; `locations.json` entries
+  embed the `courses[]` summary so the UI needs one fetch.
+- **UI**: course dropdown (multi-course locations only), `?course=` deep link, facts and
+  legend update per course; provenance labels are per-course, not per-location.
+- **Second curated case (queued)**: Karaman greben — the layer exists for it; picking the
+  good ways first needs an OSM-mapping pass.
 
 ## Status vs milestones
 
@@ -70,32 +94,39 @@ Design invariants worth preserving:
   relief toggle, loading/error/WebGL2 states, responsive + touch targets.
 - **M3 handoff/publishing** — done. Docs (this file, README), relativity of all paths
   verified on a nested subpath, GitHub Pages workflow live, attribution visible in-app.
+- **Plan v0.2 round** — done. Curated course layer + Pančićev vrh switchable course;
+  descent smoothing (damped height/look, ease-in blend, smoothed camera path);
+  ribbon thinner (2.5 → 1.9 m half-width); landmark decluttering; `?course=` deep links.
 
-QA (`npm run qa`) passes for both locations with zero console errors, including against the
-deployed Pages URL.
+QA (`npm run qa`) passes for both locations with zero console errors, including course
+switching at Kopaonik and the `?loc=kopaonik&course=pancic-vrh` deep link.
 
 ## Known gaps / next candidates
 
-1. **Karaman greben mis-mapping in OSM:** its ways form a contour circuit (2.9 km winding,
-   ~170 m net drop, climbs back), so it can never be featured as-is. This is the concrete
-   seed for a "curated correction layer": allow a curated route file per location
-   (documented provenance; plan M0 item 5 covers the rationale).
-2. **Kopaonik official facts:** none verified; facts panel says so explicitly. A resolution
-   (official resort doc or measured reference) would upgrade Duboka 1's card honesty.
-3. **Landmark label decluttering** near the Streif start where several sections crowd.
-4. **Featured ribbon width** reads road-like at descent-camera range; consider distance-based
-   width or thinner profile.
-5. **Hover pick radius** is AOI-relative; feel fine at current AOIs, recheck if an AOI is
-   added at a very different scale.
-6. Dev-server port conflicts in this workspace; `port 5300` convention was used (5173 was
+1. **Course narrative features** (top of backlog, plan v0.2 list): gradient ribbon,
+   synced elevation profile, race-story mode.
+2. **Karaman greben curated curation** — the layer exists; needs a way-selection pass
+   (its OSM mapping is a contour circuit; no monotone chain remains to reuse).
+3. **Kopaonik official facts:** none verified; facts panel says so explicitly. A resolution
+   (official resort doc or measured reference) would upgrade Duboka 1's card honesty —
+   Pančićev vrh has the same gap (race-line fidelity unchecked).
+4. **Pančićev vrh alternates excluded, not merged:** the fork at ~1840 m offers two lines;
+   the curated file documents the single-branch choice. A compare-the-branches feature
+   could revisit this.
+5. Dev-server port conflicts in this workspace; `port 5300` convention was used (5173 was
    occupied during development).
 
 ## Maintenance quicknotes
 
 - To change visual palette: `src/scene/terrainMesh.ts` (grayscale ramp), `routeLayer.ts`
   (`PISTE_COLORS`), `style.css` swatches — keep swatches and scene colors in sync.
-- To change the descent timing: `route.descentDurationSeconds` is stamped by
-  `assemble-route.mjs` from route length; reduced-motion doubles it at runtime.
+- To change the descent feel: `descent.ts` constants (`CAM_OFFSET_M`, `LOOK_AHEAD_M`,
+  `HEIGHT_DAMPING`, `LOOK_DAMPING`, `BLEND_SECONDS`, `EASE_WINDOW`); base timing per course
+  is `route.descentDurationSeconds`, stamped by `assemble-route.mjs` from route length;
+  reduced-motion doubles it at runtime.
+- Curated courses live in two places: the input (`scripts/data-prep/curated/...`, reviewed
+  provenance) and the generated `public/data/<id>/routes/<course>.json`. Edit the input,
+  re-run `npm run prep:data -- <id>`; never hand-edit the generated files.
 - The data pipeline caches Overpass JSON and terrain tiles under `scripts/data-prep/raw/`
   (git-ignored, ~170 MB); delete it to force re-fetch.
 - Deployment is zero-touch: push to `main` → Pages. First-time setup steps used: `gh repo

@@ -1,10 +1,10 @@
 # Downhill Atlas — Development Plan
 
-**Version:** 0.1  
-**Date:** 20 October 2026  
+**Version:** 0.2  
+**Date:** 21 October 2026  
 **Purpose:** A development-ready starting plan for a local-first prototype of the Kitzbühel Streif in a stylized 3D mountain scene.
 
-> **Status (21 Oct 2026):** this plan has been fully implemented and exceeded — both locations, all four milestones complete, deployed to GitHub Pages. Current state, running instructions, gaps, and next-step candidates live in [HANDOVER.md](HANDOVER.md); feature/usage documentation in [README.md](README.md).
+> **Status (21 Oct 2026):** the original four milestones (M0–M3) are fully implemented and deployed to GitHub Pages. Plan v0.2 adds the curated-course layer, switchable second courses, and descent/polish work — see "Plan v0.2 addendum" below. Current state and running instructions: [HANDOVER.md](HANDOVER.md); feature/usage documentation in [README.md](README.md).
 
 ## Product outcome
 
@@ -150,7 +150,59 @@ Do not couple route features to Three.js objects in source data. Convert to mesh
 
 ## First development task for an agent
 
-*(Completed — this was the original kickoff brief. The equivalent "next task" brief for a future agent: pick up from HANDOVER.md's "Known gaps" list, starting with the curated-route override mechanism motivated by the Karaman greben finding.)*
+*(Completed — this was the original kickoff brief.)*
+
+## Plan v0.2 addendum — curated courses & smoothness (21 Oct 2026)
+
+Implemented in this phase:
+
+### A. Curated route layer + switchable second courses (done)
+1. **Curated input convention** — `scripts/data-prep/curated/<loc>/<course>.json`
+   (`downhill-atlas-curated-route/1`): ordered OSM way list, join-gap measurements,
+   exclusion notes and provenance, reviewed against the DEM. Realizes plan M0 item 5.
+2. **Pipeline** — `assemble-route.mjs` emits the unchanged default `route.json` plus
+   per-course `routes/<id>.json` files and a `routes/index.json` summary; each course
+   carries its own `source` (way ids, curated date) and DEM `estimates`. A descent
+   sanity check (net drop vs. climb) is recorded in the `curation` block.
+3. **Index** — `locations.json` entries gain `courses[]`; `write-manifest.mjs` indexes
+   curated courses as their own sources; `export-context.mjs` keeps curated ways out
+   of the context layer.
+4. **First curated course: Pančićev vrh (Kopaonik).** Data finding: the modern OSM
+   mapping of Панчићев врх is four closed zero-net contour circuits (like Karaman
+   greben), so the curated chain uses the older fragmented ways
+   (808543059 → 958974764 → 44225656 → 958974765; 1,380 m, 1960→1732 m, joins 0 m,
+   strictly monotone). Excluded alternates are documented in the curated file.
+5. **UI** — course selector in the bottom controls (only shown for multi-course
+   locations), `?course=` deep links, facts panel always labels the course source
+   ("OSM piste relation" / "OSM named ways" / "OSM ways, curated order") and shows
+   the active course's own estimates; selection card labels the featured course's
+   provenance.
+
+### B. Visual polish (done)
+1. **Descent smoothness** — camera height follows a lightly smoothed elevation
+   profile (ribbon stays on the raw DEM line), exponentially damped towards
+   `terrain + offset` (no more per-frame snapping over DEM ridges); the look target
+   is damped at a fixed 88 m lookahead; a ~1 s ease-in flies the camera from the
+   orbit pose into the ride; cruise speed is constant with smooth windows at the
+   ends; the finish triggers the existing auto-return to overview.
+2. **Ribbon width** — featured half-width reduced 2.5 → 1.9 m so it reads less
+   road-like at descent range.
+3. **Label decluttering** — screen-space culling in route order (crowded Streif
+   start sections no longer overlap).
+
+### C. Backlog (prioritized; next up = 1)
+1. **Course narrative** — gradient-colored ribbon with labeled section steepness,
+   elevation-profile chart synced to the descent (scrubbable), race-story mode,
+   Karaman greben as the second curated course.
+2. **Scene depth** — slope-angle shading toggle, contour lines, real lift
+   towers/cables, summit labels, static time-of-day lighting presets.
+3. **Interaction** — descent speed control/scrub, alternate descent cameras,
+   two-course compare overlay, more deep links (?course= shipped), mobile perf pass.
+4. **Scale-out** — Val d'Isère (the brief's named Phase-2 candidate), landing/index
+   page from `locations.json`, OpenSkiData bulk ingestion.
+
+Constraints unchanged: static build, no runtime API keys, no live data, ODbL/manifest
+honesty; scene is a visualization, not navigation or safety guidance.
 
 ## Reference facts and sources
 

@@ -1,5 +1,6 @@
 // Write the provenance manifest per location (Milestone-0 style documentation).
 
+import fs from 'node:fs';
 import {
   TERRARIUM_ZOOM,
   localOrigin,
@@ -73,6 +74,24 @@ function step(loc) {
     },
   ];
 
+  // additional (curated) courses: provenance recorded per course in their
+  // routes/<id>.json files; the manifest indexes them here.
+  const courses = readCourses(loc);
+  for (const course of (courses ?? []).filter((course) => course.id !== route.courseId)) {
+    const built = readJson(`${outDirOf(loc)}/${course.file}`);
+    const curatedSource = built.source;
+    sources.push({
+      id: `course-${course.id}`,
+      name: `OpenStreetMap — ${course.name} (curated way order in ${course.file})`,
+      access: `Overpass API extract; ordered way ids ${curatedSource.wayIdsInOrder.join(', ')}; curated ${curatedSource.curatedAt}; join gaps ${curatedSource.joinGapsMeters.join(', ')} m`,
+      license: 'ODbL 1.0 (© OpenStreetMap contributors)',
+      attribution: 'Route: © OpenStreetMap contributors, curated ordering by this project',
+      processing:
+        'Ways pinned in a curated order whose endpoint joins measure within tolerance; oriented by elevation; resampled at 10 m spacing.',
+      limitation: 'Curated single-branch selection; alternates excluded rather than merged; not a survey line.',
+    });
+  }
+
   const manifest = {
     format: 'downhill-atlas-manifest/1',
     locationId: loc.id,
@@ -86,6 +105,7 @@ function step(loc) {
     },
     officialCourseFacts: loc.officialFacts ?? null,
     featuredDifficultyNote: loc.featuredDifficultyNote ?? null,
+    courses: readCourses(loc),
     demEstimates: {
       note: 'Derived from prepared route geometry + 25 m DEM sampling; NOT survey values.',
       demRouteLengthMeters: Math.round((route.points.length - 1) * route.spacing),
@@ -117,6 +137,14 @@ function step(loc) {
 
 function readRouteJson(loc) {
   return readJson(`${outDirOf(loc)}/route.json`);
+}
+
+function readCourses(loc) {
+  try {
+    return JSON.parse(fs.readFileSync(`${outDirOf(loc)}/routes/index.json`, 'utf8')).courses;
+  } catch {
+    return null;
+  }
 }
 
 const locationIds = process.argv.slice(2).length

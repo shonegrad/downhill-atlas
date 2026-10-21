@@ -162,6 +162,53 @@ function variantScore(res) {
   return length + Math.min(closure, 5000) / 250;
 }
 
+// --- Curated ordered-way stitching --------------------------------------------
+
+// Stitch the given OSM ways in the exact order provided by a curated input
+// file (downhill-atlas-curated-route/1). Orientation of each segment is chosen
+// by the join distance; the whole chain is later oriented by elevation. Unlike
+// orientAndJoin this never reorders, so curated intent is preserved; gaps
+// beyond the tolerance are recorded and reported instead of silently merging.
+export function stitchOrderedWays(loc, raw, orderedWayIds, { tolerance = JOINT_TOLERANCE_M } = {}) {
+  const ways = new Map(raw.elements.filter((e) => e.type === 'way').map((w) => [w.id, w]));
+  const missing = [];
+  const segments = [];
+  for (const id of orderedWayIds) {
+    const way = ways.get(id);
+    if (!way) {
+      missing.push(id);
+      continue;
+    }
+    segments.push({ pts: way.geometry.map((p) => ({ lat: p.lat, lon: p.lon })), osmWayId: way.id });
+  }
+  const latRef = aoiCenter(loc.aoi).lat;
+
+  const chain = [];
+  const gaps = [];
+  let head = null;
+  for (const seg of segments) {
+    const pts = seg.pts.slice();
+    if (head) {
+      const dF = dist(head, pts[0], latRef);
+      const dL = dist(head, pts[pts.length - 1], latRef);
+      const gap = Math.min(dF, dL);
+      if (gap > tolerance) {
+        gaps.push(Math.round(gap));
+        console.warn(
+          `[curated] way ${seg.osmWayId} joins ${loc.id} chain with a ${Math.round(gap)} m gap (tolerance ${tolerance})`,
+        );
+      }
+      if (dL < dF) pts.reverse();
+    }
+    for (const p of pts) {
+      const prev = chain[chain.length - 1];
+      if (!prev || p.lat !== prev.lat || p.lon !== prev.lon) chain.push(p);
+    }
+    head = pts[pts.length - 1];
+  }
+  return { chain, gaps, segCount: segments.length, missing, joinGapsMeters: gaps };
+}
+
 // --- Featured route assembly --------------------------------------------------
 
 export function assembleFeatured(loc, raw, landmarksRaw) {

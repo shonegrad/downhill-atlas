@@ -1,10 +1,14 @@
 import {
   loadDataset,
   loadLocations,
+  loadRoute,
+  routeSourceLabel,
+  type CourseSummary,
   type Dataset,
   type LocationsAsset,
   type LocationEntry,
   type ManifestAsset,
+  type RouteAsset,
 } from '../data/loader';
 import { createScene, type FeatureInfo, type SceneHandle } from '../scene/createScene';
 
@@ -40,11 +44,15 @@ export async function bootApp(canvas: HTMLCanvasElement): Promise<void> {
   const btnRelief = el<HTMLButtonElement>('btn-relief');
   const btnSelClose = el<HTMLButtonElement>('sel-close');
   const locationSelect = el<HTMLSelectElement>('location-select');
+  const courseSelect = el<HTMLSelectElement>('course-select');
   const selectionPanel = el<HTMLDivElement>('selection-panel');
 
   let mode = Mode.Overview;
   let scene: SceneHandle | null = null;
   let activeEntry: LocationEntry | null = null;
+  let activeDir = '';
+  let activeCourses: CourseSummary[] = [];
+  let currentRoute: RouteAsset | null = null;
   let routeName = '';
   let routeDifficulty: string | null = null;
   let pisteClasses: string[] = [];
@@ -74,7 +82,8 @@ export async function bootApp(canvas: HTMLCanvasElement): Promise<void> {
   }
 
   function fillSelection(info: FeatureInfo) {
-    const kindLabel = info.kind === 'featured' ? 'Featured course' : info.kind === 'piste' ? 'Piste (context)' : 'Lift';
+    const kindLabel =
+      info.kind === 'featured' ? 'Featured course' : info.kind === 'piste' ? 'Piste (context)' : 'Lift';
     const h2 = document.createElement('h2');
     h2.textContent = kindLabel;
     const name = document.createElement('h3');
@@ -86,10 +95,17 @@ export async function bootApp(canvas: HTMLCanvasElement): Promise<void> {
     ];
     if (info.kind === 'lift') {
       rows.push(['Lift type', info.liftType || 'unspecified']);
+      rows.push(['Source', `OSM way ${info.osmWayId} (ODbL)`]);
+    } else if (info.kind === 'piste') {
+      rows.push(['Difficulty', info.difficulty ? `${info.difficulty} (as mapped)` : 'unclassified']);
+      rows.push(['Source', `OSM way ${info.osmWayId} (ODbL)`]);
     } else {
       rows.push(['Difficulty', info.difficulty ? `${info.difficulty} (as mapped)` : 'unclassified']);
+      rows.push([
+        'Source',
+        currentRoute ? `${routeSourceLabel(currentRoute)} (ODbL)` : 'prepared course (ODbL)',
+      ]);
     }
-    rows.push(['Source', `OSM way ${info.osmWayId} (ODbL)`]);
     for (const [term, defn] of rows) {
       const dt = document.createElement('dt');
       dt.textContent = term;
@@ -99,7 +115,8 @@ export async function bootApp(canvas: HTMLCanvasElement): Promise<void> {
     }
     const note = document.createElement('p');
     note.className = 'legend-note';
-    note.textContent = 'Length and elevations are estimates from prepared geometry and the DEM; official numbers are listed in Facts where verified.';
+    note.textContent =
+      'Length and elevations are estimates from prepared geometry and the DEM; official numbers are listed in Facts where verified.';
     selectionPanel.replaceChildren(h2, name, dl, note);
   }
 
@@ -161,9 +178,16 @@ export async function bootApp(canvas: HTMLCanvasElement): Promise<void> {
     btnRelief.setAttribute('aria-pressed', String(next !== 1));
   });
 
-  function fillPanels(manifest: ManifestAsset) {
+  function fillPanels(manifest: ManifestAsset, route: RouteAsset) {
     const f = manifest.officialCourseFacts;
-    const d = manifest.demEstimates;
+    const d = route.estimates
+      ? {
+          demRouteLengthMeters: Math.round((route.points.length - 1) * route.spacing),
+          demVerticalDropMeters: route.estimates.demVerticalDrop,
+          demStartElevationMeters: route.estimates.demStartElevation,
+          demFinishElevationMeters: route.estimates.demFinishElevation,
+        }
+      : manifest.demEstimates;
     const rows: (string | null)[][] = [];
     if (f) {
       rows.push(
@@ -184,7 +208,7 @@ export async function bootApp(canvas: HTMLCanvasElement): Promise<void> {
       );
     }
     rows.push(['Difficulty', routeName ? (routeDifficulty ? `${routeDifficulty} (as mapped)` : 'unclassified') : '—']);
-    rows.push(['Sources', 'see Data & attribution']);
+    rows.push(['Course source', routeSourceLabel(route)]);
     const h2 = document.createElement('h2');
     h2.textContent = 'Facts';
     const dl = document.createElement('dl');
@@ -343,18 +367,55 @@ export async function bootApp(canvas: HTMLCanvasElement): Promise<void> {
     return found;
   }
 
+  function populateCourseSelect(courses: CourseSummary[], selectedId: string) {
+    courseSelect.replaceChildren(
+      ...courses.map((course) => {
+        const opt = document.createElement('option');
+        opt.value = course.id;
+        opt.textContent = course.name + (course.curated ? ' (curated)' : '');
+        return opt;
+      }),
+    );
+    courseSelect.value = selectedId;
+    courseSelect.hidden = courses.length < 2;
+    courseSelect.setAttribute('aria-label', 'Choose course');
+  }
+
+  async function switchCourse(course: CourseSummary, manifest: ManifestAsset) {
+    if (mode === Mode.Descent) setMode(Mode.Overview);
+    closeSelection();
+    const route = await loadRoute(`./data/${activeDir}`, course.file);
+    currentRoute = route;
+    routeName = route.name;
+    routeDifficulty = route.difficulty ?? null;
+    scene?.swapRoute(route);
+    courseSelect.value = course.id;
+    visibleLayers.add('featured');
+    fillPanels(manifest, route);
+    fillLegend();
+    const url = new URL(location.href);
+    if (course.isDefault) {
+      url.searchParams.delete('course');
+    } else {
+      url.searchParams.set('course', course.id);
+    }
+    history.replaceState(null, '', url.toString());
+  }
+
   try {
     loading.hidden = false;
     const locations = await loadLocations();
     activeEntry = populateLocationSelect(locations);
     if (!activeEntry) throw new Error('No locations available.');
+    activeDir = activeEntry.dir;
     if (hudTitle && hudSubtitle) {
       const [place, region] = activeEntry.display.split(' — ');
       hudTitle.textContent = 'Downhill Atlas';
       hudSubtitle.textContent = `${place ?? activeEntry.display} (${region ?? ''}) — 3D visualization prototype`;
     }
 
-    const data: Dataset = await loadDataset(`./data/${activeEntry.dir}`);
+    const data: Dataset = await loadDataset(`./data/${activeDir}`);
+    currentRoute = data.route;
     routeName = data.route.name;
     routeDifficulty = data.route.difficulty ?? null;
     pisteClasses = Array.from(
@@ -375,10 +436,30 @@ export async function bootApp(canvas: HTMLCanvasElement): Promise<void> {
     loading.hidden = true;
     visibleLayers = new Set(['featured', ...pisteClasses.filter((c) => c !== 'none')]);
     if (hasLifts) visibleLayers.add('lift');
-    fillPanels(data.manifest);
+    fillPanels(data.manifest, data.route);
     fillManifest(data.manifest);
     fillLegend();
     appRoot.classList.add('ready');
+
+    // courses (curated extra routes) — honor ?course= deep links
+    activeCourses = activeEntry.courses ?? [];
+    const wanted = new URLSearchParams(location.search).get('course');
+    const defaultCourse = activeCourses.find((c) => c.isDefault) ?? activeCourses[0];
+    const initialCourse = wanted ? activeCourses.find((c) => c.id === wanted) ?? defaultCourse : defaultCourse;
+    if (initialCourse) {
+      populateCourseSelect(activeCourses, initialCourse.id);
+      if (initialCourse.file !== 'route.json') {
+        await switchCourse(initialCourse, data.manifest);
+      }
+      courseSelect.addEventListener('change', () => {
+        const next = activeCourses.find((c) => c.id === courseSelect.value);
+        if (next && next.id !== currentRoute?.courseId) {
+          void switchCourse(next, data.manifest).catch((err) => {
+            console.error('course switch failed', err);
+          });
+        }
+      });
+    }
 
     scene.setVerticalScale(data.terrain.verticalScale);
     btnReset.hidden = false;

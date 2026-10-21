@@ -14,14 +14,30 @@ export interface TerrainAsset {
 
 export interface RouteAsset {
   format: string;
+  courseId?: string;
+  subtitle?: string;
   name: string;
   nameSource?: string;
   nameSourceLatin?: string;
   difficulty?: string | null;
+  source?: {
+    type: string;
+    relation?: number;
+    wayNameMatch?: string;
+    wayIdsInOrder?: number[];
+    curatedAt?: string;
+    attribution: string;
+    extractedAt?: string;
+  };
   origin: { lat: number; lon: number };
   spacing: number;
   points: number[][];
   descentDurationSeconds?: number;
+  estimates?: {
+    demStartElevation: number;
+    demFinishElevation: number;
+    demVerticalDrop: number;
+  };
   landmarks: {
     id: string;
     name: string;
@@ -30,6 +46,14 @@ export interface RouteAsset {
     routeDistance: number;
     source: string;
   }[];
+}
+
+export interface CourseSummary {
+  id: string;
+  name: string;
+  file: string;
+  isDefault: boolean;
+  curated: boolean;
 }
 
 export interface FeatureAsset {
@@ -82,6 +106,7 @@ export interface LocationEntry {
   featuredSubtitle: string;
   featuredDifficulty?: string | null;
   hasOfficialFacts: boolean;
+  courses?: CourseSummary[] | null;
 }
 
 export interface LocationsAsset {
@@ -117,4 +142,15 @@ export async function loadDataset(base = './data/streif'): Promise<Dataset> {
 
 export async function loadLocations(): Promise<LocationsAsset> {
   return loadJson<LocationsAsset>('./data/locations.json');
+}
+
+export async function loadRoute(base: string, file: string): Promise<RouteAsset> {
+  return loadJson<RouteAsset>(file.startsWith('routes/') ? `${base}/${file}` : `${base}/route.json`);
+}
+
+export function routeSourceLabel(route: RouteAsset): string {
+  const type = route.source?.type ?? 'osm-named-ways';
+  if (type === 'curated-way-list') return 'OSM ways, curated order';
+  if (type === 'osm-relation') return 'OSM piste relation';
+  return 'OSM named ways';
 }

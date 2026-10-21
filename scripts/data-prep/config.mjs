@@ -12,6 +12,7 @@ export const LOCATIONS = {
     rawPrefix: 'osm-kitzbuehel',
     routeRelationId: 12870777,
     featuredMode: 'relation',
+    featuredId: 'streif',
     landmarkNodeIds: [
       3308152316, 3686575490, 3308156554, 3308156555, 3308181028, 3308181029, 3308181030,
       3308192322, 3308192323, 3308210431, 3308210432, 3308210433, 3308210434, 3308210435,
@@ -29,6 +30,7 @@ export const LOCATIONS = {
     id: 'kopaonik',
     dir: 'kopaonik',
     display: 'Duboka 1 — Kopaonik, Serbia',
+    featuredId: 'duboka-1',
     featuredName: 'Дубока 1',
     featuredNameLatin: 'Duboka 1',
     featuredSubtitle: 'Kopaonik piste (as mapped)',
@@ -41,6 +43,19 @@ export const LOCATIONS = {
     landmarks: false,
     aoi: { latSouth: 43.262, latNorth: 43.331, lonWest: 20.788, lonEast: 20.891 },
     officialFacts: null,
+    // Additional courses emitted as public/data/<dir>/routes/<id>.json.
+    // Geometry stays loaded from the same OSM extract; a curated input file
+    // (downhill-atlas-curated-route/1) pins the way order and documents why.
+    extraCourses: [
+      {
+        id: 'pancic-vrh',
+        name: 'Pančićev vrh',
+        nameSource: 'Панчићев врх',
+        subtitle: 'Kopaonik piste (curated way order)',
+        difficulty: 'intermediate',
+        curated: 'curated/kopaonik/pancic-vrh.json',
+      },
+    ],
   },
 };
 

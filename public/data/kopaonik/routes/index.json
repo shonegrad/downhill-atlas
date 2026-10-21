@@ -1,0 +1,1 @@
+{"format":"downhill-atlas-courses/1","locationId":"kopaonik","default":"duboka-1","courses":[{"id":"duboka-1","name":"Duboka 1","file":"route.json","isDefault":true,"curated":false},{"id":"pancic-vrh","name":"Pančićev vrh","file":"routes/pancic-vrh.json","isDefault":false,"curated":true}]}

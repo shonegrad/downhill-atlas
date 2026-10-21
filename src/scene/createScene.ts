@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import type { Dataset } from '../data/loader';
+import type { Dataset, RouteAsset } from '../data/loader';
 import { buildTerrain, repaintByNormals } from './terrainMesh';
 import { applyHighlight, buildContextFeatures, buildFeaturedCourse, type FeatureRecord } from './routeLayer';
 import { buildLandmarks, type LandmarkLayer } from './labels';
@@ -37,15 +37,17 @@ export interface SceneHandle {
   presetTopDown: () => void;
   presetCourseStart: () => void;
   setLayerVisible: (layer: string, visible: boolean) => void;
-  hasLandmarks: boolean;
+  readonly hasLandmarks: boolean;
   setLandmarksVisible: (visible: boolean) => void;
+  swapRoute: (route: RouteAsset) => void;
   getFeatureInfo: (featureId: string) => FeatureInfo | null;
   setSelected: (featureId: string | null) => void;
   dispose: () => void;
 }
 
 export function createScene(canvas: HTMLCanvasElement, data: Dataset, callbacks: SceneCallbacks): SceneHandle {
-  const { terrain, route, pistes, lifts } = data;
+  const { terrain, pistes, lifts } = data;
+  let route = data.route;
 
   const width = Math.max(canvas.clientWidth || window.innerWidth, 1);
   const height = Math.max(canvas.clientHeight || window.innerHeight, 1);
@@ -86,7 +88,7 @@ export function createScene(canvas: HTMLCanvasElement, data: Dataset, callbacks:
   repaintByNormals(terrain, terrainMesh);
   terrainGroup.add(terrainMesh);
 
-  const course = buildFeaturedCourse(terrain, route);
+  let course = buildFeaturedCourse(terrain, route);
   const context = buildContextFeatures(terrain, pistes, lifts);
   terrainGroup.add(course.group);
   terrainGroup.add(context.group);
@@ -98,18 +100,26 @@ export function createScene(canvas: HTMLCanvasElement, data: Dataset, callbacks:
   }
   applyScale();
 
-  const landmarks: LandmarkLayer | null = buildLandmarks(terrain, route);
+  let landmarks: LandmarkLayer | null = buildLandmarks(terrain, route);
   let landmarksOn = !!landmarks;
 
-  const entries: FeatureRecord[] = [course.entry, ...context.entries];
+  let entries: FeatureRecord[] = [];
   const byId = new Map<string, FeatureRecord>();
   const byUuid = new Map<string, FeatureRecord>();
-  for (const entry of entries) {
-    byId.set(entry.id, entry);
-    for (const obj of entry.objects) byUuid.set(obj.uuid, entry);
+  let pickables: THREE.Object3D[] = [];
+
+  function rebuildFeatureIndex() {
+    entries = [course.entry, ...context.entries];
+    byId.clear();
+    byUuid.clear();
+    for (const entry of entries) {
+      byId.set(entry.id, entry);
+      for (const obj of entry.objects) byUuid.set(obj.uuid, entry);
+    }
+    pickables = [];
+    for (const entry of entries) pickables.push(...entry.objects);
   }
-  const pickables: THREE.Object3D[] = [];
-  for (const entry of entries) pickables.push(...entry.objects);
+  rebuildFeatureIndex();
 
   const visibleLayers = new Set<string>([course.entry.layer, ...context.layers]);
 
@@ -180,11 +190,42 @@ export function createScene(canvas: HTMLCanvasElement, data: Dataset, callbacks:
 
   // --- descent -------------------------------------------------------------------
   const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const baseDuration = route.descentDurationSeconds ?? 75;
-  const descent = new DescentController(terrain, route, {
-    durationSeconds: prefersReducedMotion ? baseDuration * 2 : baseDuration,
-    onDone: () => callbacks.onDescentEnd(),
-  });
+  let descent = makeDescent(route);
+
+  function makeDescent(routeFor: RouteAsset): DescentController {
+    const baseDuration = routeFor.descentDurationSeconds ?? 75;
+    return new DescentController(terrain, routeFor, {
+      durationSeconds: prefersReducedMotion ? baseDuration * 2 : baseDuration,
+      onDone: () => callbacks.onDescentEnd(),
+    });
+  }
+
+  function disposeObject(obj: THREE.Object3D) {
+    obj.traverse((child) => {
+      const mesh = child as THREE.Mesh;
+      if (mesh.geometry) mesh.geometry.dispose();
+      const mat = mesh.material as THREE.Material | THREE.Material[] | undefined;
+      if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
+      else if (mat) mat.dispose();
+    });
+  }
+
+  function swapRoute(next: RouteAsset) {
+    if (descent.isPlaying()) descent.stop();
+    terrainGroup.remove(course.group);
+    disposeObject(course.group);
+    landmarks?.host.remove();
+
+    route = next;
+    course = buildFeaturedCourse(terrain, route);
+    terrainGroup.add(course.group);
+    landmarks = buildLandmarks(terrain, route);
+    landmarksOn = !!landmarks;
+    descent = makeDescent(route);
+    rebuildFeatureIndex();
+    if (selectedId) selectedId = null;
+    hoveredId = null;
+  }
 
   // --- pointer interaction ---------------------------------------------------------
   let downPos: { x: number; y: number; time: number } | null = null;
@@ -259,6 +300,7 @@ export function createScene(canvas: HTMLCanvasElement, data: Dataset, callbacks:
 
   return {
     startDescent: (fromBeginning: boolean) => {
+      descent.captureBlend(camera);
       descent.start(fromBeginning);
       canvas.style.cursor = '';
       callbacks.onFeatureHover(null);
@@ -289,10 +331,13 @@ export function createScene(canvas: HTMLCanvasElement, data: Dataset, callbacks:
         for (const obj of entry.objects) obj.visible = visible;
       }
     },
-    hasLandmarks: Boolean(landmarks),
+    get hasLandmarks() {
+      return Boolean(landmarks);
+    },
     setLandmarksVisible: (visible: boolean) => {
       landmarksOn = visible && Boolean(landmarks);
     },
+    swapRoute,
     getFeatureInfo: (featureId: string): FeatureInfo | null => {
       const record = byId.get(featureId);
       if (!record) return null;

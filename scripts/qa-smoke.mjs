@@ -87,6 +87,27 @@ for (const loc of ['streif', 'kopaonik']) {
   await page.click('#legend .legend-item');
   await new Promise((r) => setTimeout(r, 200));
 
+  // course switcher (only where the location ships multiple courses)
+  const coursesVisible = await page.$eval('#course-select', (n) => !n.hidden);
+  console.log(`    course select visible: ${coursesVisible}`);
+  if (coursesVisible) {
+    const factsBefore = await page.$eval('#facts', (n) => n.textContent);
+    await page.select('#course-select', await page.$eval('#course-select', (n) => n.options[n.options.length - 1].value));
+    await new Promise((r) => setTimeout(r, 800));
+    const factsAfter = await page.$eval('#facts', (n) => n.textContent);
+    if (factsBefore === factsAfter) report(`[${loc}] facts panel unchanged after course switch`);
+    const legendAfter = await page.$eval('#legend', (n) => n.textContent);
+    const courseName = await page.$eval('#course-select', (n) => n.options[n.selectedIndex].text);
+    if (!legendAfter.includes('featured course')) report(`[${loc}] legend missing featured course row after switch`);
+    console.log(`    switched to course: ${courseName}`);
+    await page.screenshot({ path: `${OUT}/${loc}-2b-second-course.png` });
+    // switch back to the default course
+    await page.select('#course-select', await page.$eval('#course-select', (n) => n.options[0].value));
+    await new Promise((r) => setTimeout(r, 800));
+    const url = await page.url();
+    if (url.includes('course=')) report(`[${loc}] ?course param not cleared when returning to default course`);
+  }
+
   // camera presets
   await page.click('#btn-top-down');
   await page.screenshot({ path: `${OUT}/${loc}-3-topdown.png` });
@@ -128,6 +149,24 @@ await page.goto(BASE + '/', { waitUntil: 'networkidle0' });
 const selectValue = await page.$eval('#location-select', (n) => n.value);
 console.log(`default location selected: ${selectValue}`);
 if (!selectValue) report('location select empty on default URL');
+await page.close();
+
+// deep link: ?loc=kopaonik&course=pancic-vrh loads the curated course directly
+const deep = await browser.newPage();
+const deepErrors = [];
+deep.on('console', (m) => {
+  if (m.type() === 'error') deepErrors.push(m.text());
+});
+await deep.goto(`${BASE}/?loc=kopaonik&course=pancic-vrh`, { waitUntil: 'networkidle0', timeout: 60000 });
+await new Promise((r) => setTimeout(r, 1500));
+const deepCourse = await deep.$eval('#course-select', (n) => n.value);
+console.log(`deep link course selected: ${deepCourse}`);
+if (deepCourse !== 'pancic-vrh') report(`deep link course not honored (got ${deepCourse})`);
+const deepFacts = await deep.$eval('#facts', (n) => n.textContent);
+if (!deepFacts.includes('curated order')) report('deep link facts panel lacks curated course source label');
+if (deepErrors.length) report(`[deep] ${deepErrors.length} console error(s): ${deepErrors.slice(0, 4).join(' | ')}`);
+await deep.screenshot({ path: `${OUT}/deep-course.png` });
+await deep.close();
 
 await browser.close();
 if (problems.length) {

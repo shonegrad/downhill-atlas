@@ -59,7 +59,9 @@ function polylineStats(t: TerrainAsset, points: number[][]) {
 export function buildFeaturedCourse(t: TerrainAsset, route: RouteAsset): { group: THREE.Group; entry: FeatureRecord; pickables: THREE.Object3D[] } {
   const group = new THREE.Group();
   const pts = route.points;
-  const halfWidth = 2.5;
+  // Thinner profile so the ribbon reads as a course line rather than a road
+  // at descent-camera range (was 2.5).
+  const halfWidth = 1.9;
 
   const center: THREE.Vector3[] = [];
   const side: THREE.Vector3[] = [];

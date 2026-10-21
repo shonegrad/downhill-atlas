@@ -1,0 +1,33 @@
+{
+  "format": "downhill-atlas-curated-route/1",
+  "courseId": "pancic-vrh",
+  "name": "Pančićev vrh",
+  "nameSource": "Панчићев врх",
+  "subtitle": "Kopaonik piste (curated way order)",
+  "difficulty": "intermediate",
+  "selection": {
+    "strategy": "ordered-ways-by-name",
+    "wayIdsInOrder": [808543059, 958974764, 44225656, 958974765]
+  },
+  "provenance": {
+    "curatedAt": "2026-10-21",
+    "by": "Downhill Atlas data-prep analysis (scripts/data-prep)",
+    "method": "All OSM ways named Панчићев врх in the extract were inspected against the 25 m DEM. Zero-net circuits and out-of-tolerance alternates were excluded; the remaining four ways were pinned in an order whose endpoint joins measure 0 m and whose DEM profile descends monotonically.",
+    "joinGapsMeters": [0, 0, 0],
+    "excludedWayIds": [
+      1122810583, 1122810584, 1122810585, 1122810586, 915223219, 1003621284,
+      44225629, 44225657, 44225684, 50893722, 1036996993
+    ],
+    "exclusionNotes": [
+      "Ways 1122810583-1122810586, 915223219 and 1003621284 are mapped as closed circuits (start equals end; DEM shows zero net drop), so they cannot represent a descent as-is.",
+      "Way 44225657 (762 m) is an older alternate mapping of the same north branch; the 958974764 + 44225656 + 958974765 chain replaces it.",
+      "Ways 44225684 and 50893722 trace eastern alternates; their joins to the selected branch exceed the 30 m tolerance.",
+      "Way 44225629 carries no piste:type tag and climbs (+236 m) in the mapped direction."
+    ],
+    "knownGaps": [
+      "Single-branch selection: the fork at ~1840 m offers two lines; the western branch is included, the older eastern duplicate is not.",
+      "Race-line fidelity is unchecked against official course data (no verified official facts exist for Kopaonik)."
+    ]
+  },
+  "chainStrategy": "curated ordered way list; joins verified by exact endpoint overlap, oriented by DEM elevation"
+}
